@@ -6,6 +6,7 @@ import java.util.List;
 import java.io.Console;
 
 class TCPClient {
+<<<<<<< HEAD
 	private String HTTPMETHOD = null;
 	private String URI = null;
 	private String PORT = null;
@@ -56,12 +57,24 @@ class TCPClient {
 			
 		BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
 		Socket clientSocket = new Socket("localhost", 6799);
+=======
+	public static void main(String argv[]) throws Exception {
+		System.out.println("Client started!");
+		Socket clientSocket = new Socket("localhost", TCPServer.PORT);
+
+		BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
+>>>>>>> e94318c08fc80f2cd5fb4572bd61fba6e85a107f
 		DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream());
+
 		BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+		
 		String sentence = inFromUser.readLine();
 		outToServer.writeBytes(sentence + '\n');
+		
 		String modifiedSentence = inFromServer.readLine();
 		System.out.println("FROM SERVER: " + modifiedSentence);
 		clientSocket.close();
+		
+		System.out.println("Client closed!");
 	}
 }
