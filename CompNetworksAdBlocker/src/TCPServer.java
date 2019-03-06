@@ -70,6 +70,7 @@ public class TCPServer implements Runnable {
 
 			// we parse the first line of the request with a string tokenizer
 			StringTokenizer parse = new StringTokenizer(in.readLine());
+			System.out.println(parse);
 
 			method = parse.nextToken().toUpperCase();
 			fileRequested = parse.nextToken().toLowerCase();
