@@ -35,6 +35,8 @@ class TCPClient {
 	public static void main(String[] args) throws UnknownHostException, IOException {
 		if (args.length < 1) return;
 
+		
+		String HTTPMethod = "GET";
 		URL url;
 		String hostname;
 		try {
@@ -47,7 +49,7 @@ class TCPClient {
 	
 
 		//String hostname = url.getHost();
-		int port = 80;
+		int port = 8081;
 		
 		System.out.println("Client started on port: "  + port);
 		
@@ -68,7 +70,7 @@ class TCPClient {
 
 		
 //		String sentence = inFromUser.readLine();
-		requestWriter.println("GET www.tcpipguide.com/images/readdown.png HTTP/1.1");
+		requestWriter.println( HTTPMethod+" "+ url +" HTTP/1.1");
 		requestWriter.println();
 		
 
