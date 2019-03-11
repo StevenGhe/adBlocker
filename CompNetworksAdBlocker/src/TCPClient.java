@@ -3,6 +3,10 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 class TCPClient {
 	private String HTTPMETHOD = null;
@@ -21,7 +25,7 @@ class TCPClient {
 //			if(httpMethods.contains(HTTPMETHOD)) throw new IllegalArgumentException("method not supported");
 //			System.out.println("method " + HTTPMETHOD);
 			String myUrl = args[1];
-			if(!myUrl.contains("http://") || !myUrl.contains("https://")) myUrl = "http://"+myUrl;
+			if(!myUrl.contains("http://") && !myUrl.contains("https://")) myUrl = "http://"+myUrl;
 			this.URL = new URL(myUrl);
 			
 		} catch (Exception e) {
@@ -45,8 +49,10 @@ class TCPClient {
 	public void run() throws UnknownHostException, IOException {
 
 		System.out.println("Client started on port: "  + PORT);
+		System.out.println("---------------------------------");
 		System.out.println(this.HOSTNAME);
-		System.out.println(this.PORT);
+		System.out.println(this.HTTPMETHOD);
+
 		
 		Socket clientSocket = new Socket(this.HOSTNAME, this.PORT);
 		OutputStream out = clientSocket.getOutputStream();
@@ -58,15 +64,24 @@ class TCPClient {
 		
 
 		requestWriter.println( HTTPMETHOD+" "+ URL +" HTTP/1.1");
+		requestWriter.println("HOST:" + HOSTNAME);
 		requestWriter.println();
 
 		
 		System.out.println("SERVER RESPONSE ---------------");
 
+		String html = "";
 		String line;
 		while ((line = responseReader.readLine()) != null) {
 			System.out.println(line);
+			html += line;
 		}
+//		Document document = Jsoup.parse(html);
+//		Elements elements = document.select("ul.scans li a:has(img)");
+//		for(Element e: elements) {
+//			e.get
+//		}
+
 
 		System.out.println("Client closed!");
 		clientSocket.close();
