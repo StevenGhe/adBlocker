@@ -62,8 +62,7 @@ class TCPClient {
 		InputStream response = clientSocket.getInputStream();
 		BufferedReader responseReader = new BufferedReader(new InputStreamReader(response));
 		
-
-		requestWriter.println( HTTPMETHOD+" "+ URL +" HTTP/1.1");
+		requestWriter.println( HTTPMETHOD+" "+ URL.getPath() +" HTTP/1.1");
 		requestWriter.println("HOST:" + HOSTNAME);
 		requestWriter.println();
 
@@ -72,16 +71,18 @@ class TCPClient {
 
 		String html = "";
 		String line;
-		while ((line = responseReader.readLine()) != null) {
+		while ((line = responseReader.readLine()) != null ) {
 			System.out.println(line);
 			html += line;
 		}
+		
+		
+		
 //		Document document = Jsoup.parse(html);
 //		Elements elements = document.select("ul.scans li a:has(img)");
 //		for(Element e: elements) {
 //			e.get
 //		}
-
 
 		System.out.println("Client closed!");
 		clientSocket.close();
