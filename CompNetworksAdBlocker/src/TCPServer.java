@@ -8,16 +8,18 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.net.ServerSocket;
 import java.net.Socket;
-
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.StringTokenizer;
 
 public class TCPServer implements Runnable {
-	static final int PORT = 8082;
+	static final int PORT = 8085;
 	private static int connectCounter = 0;
-	private Socket connect;
+	private Socket socket;
 
 	static final File WEB_ROOT = new File("webContent/");
 	static final File FILE_ROOT = new File("saveFiles/");
@@ -31,8 +33,8 @@ public class TCPServer implements Runnable {
 
 	static final boolean verbose = true;
 
-	public TCPServer(Socket c) {
-		connect = c;
+	public TCPServer(Socket port) {
+		this.socket = port;
 	}
 
 	public static void main(String[] args) {
@@ -60,108 +62,119 @@ public class TCPServer implements Runnable {
 
 	@Override
 	public void run() {
-		BufferedReader in = null;
-		PrintWriter out = null;
-		BufferedOutputStream dataOut = null;
+		BufferedReader inputStream = null;
+		PrintWriter outputStream = null;
+		BufferedOutputStream dataOutputStream = null;
+
 		String fileRequested = null;
 		String method = null;
 		String httpVersion = null;
 
 		try {
-			in = new BufferedReader(new InputStreamReader(connect.getInputStream()));
-			// we get character output stream to client (for headers)
-			out = new PrintWriter(connect.getOutputStream());
-			// get binary output stream to client (for requested data)
-			dataOut = new BufferedOutputStream(connect.getOutputStream());
+			inputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-			// we parse the first line of the request with a string tokenizer
-			String firstLine = in.readLine();
-			System.out.println(firstLine);
-			StringTokenizer parse = new StringTokenizer(firstLine);
+			outputStream = new PrintWriter(socket.getOutputStream());
+			dataOutputStream = new BufferedOutputStream(socket.getOutputStream());
 
-			method = parse.nextToken().toUpperCase();
-			fileRequested = parse.nextToken().toLowerCase();
-			httpVersion = parse.nextToken(); // TODO: Http 505 als foute http versie
+			String[] parsedFirstLine = inputStream.readLine().split(" ");
+			method = parsedFirstLine[0].toUpperCase();
+			fileRequested = parsedFirstLine[1].toLowerCase();
+			httpVersion = parsedFirstLine[2].toUpperCase(); // TODO: Http 505 als foute http versie
 
 			switch (method) {
 			case "HEAD":
-				methodHeadGet(out, dataOut, fileRequested, false);
+				methodHeadGet(outputStream, dataOutputStream, fileRequested, false);
 				break;
 			case "GET":
-				methodHeadGet(out, dataOut, fileRequested, true);
+				methodHeadGet(outputStream, dataOutputStream, fileRequested, true);
 				break;
 			case "PUT":
-				methodPUT(in, out, dataOut, fileRequested);
+				methodPUT(inputStream, outputStream, dataOutputStream, fileRequested);
 				break;// Create new file
 			case "POST":
-				// methodPOST(out, dataOut);
+				 methodPOST(inputStream, outputStream, dataOutputStream, fileRequested);
 				break;
 			default:
-				methodNotSupported(out, dataOut, method);
+				methodNotSupported(outputStream, dataOutputStream, method);
 				break;
-
 			}
-		} catch (FileNotFoundException fnfe) {
+
+		} catch (FileNotFoundException e) {
+
 			try {
-				fileNotFound(out, dataOut, fileRequested);
-			} catch (IOException ioe) {
-				System.err.println("Error with file not found exception : " + ioe.getMessage());
+				fileNotFound(outputStream, dataOutputStream, fileRequested);
+			} catch (IOException e2) {
+				System.err.println("Error with file not found exception : " + e2.getMessage());
 			}
 
 		} catch (IOException ioe) {
 			System.err.println("Server error : " + ioe);
 		} finally {
 			try {
-				in.close();
-				out.close();
-				dataOut.close();
-				connect.close();
+				inputStream.close();
+				outputStream.close();
+				dataOutputStream.close();
+				socket.close();
 			} catch (Exception e) {
 				System.err.println("Error closing stream : " + e.getMessage());
 			}
 
 			if (verbose) {
 				System.out.println("Connection closed.\n");
+				System.out.println("----------------------");
 			}
 		}
 
 	}
 
-	private void methodPUT(BufferedReader in, PrintWriter out, BufferedOutputStream dataOut, String fileRequested)
-			throws IOException {
+	private void methodPOST(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOutputStream,
+			String fileRequested) {
 		File file = new File(FILE_ROOT, fileRequested);
 
-		if (file.createNewFile() || verbose) {
+		
+	}
+
+	private void methodPUT(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOut,
+			String fileRequested) throws IOException {
+		File file = new File(FILE_ROOT, fileRequested);
+
+		if (file.createNewFile()) {
 			if (verbose) {
 				System.out.println("File " + file.getAbsolutePath() + " is created!\n\n");
 				System.out.println("Header of PUT request:");
 			}
-			String line = in.readLine();
-			while (line != null && !line.equals("")) {
-				if (verbose)
-					System.out.println(line);
-				line = in.readLine();
-			}
 
 			FileWriter fileWriter = new FileWriter(file);
+			StringBuilder outputBuilder = new StringBuilder();
 
-			String fileContent = in.readLine();
-			while (fileContent != null && !fileContent.equals("")) {
-				if (verbose)
-					System.out.println("Writing line to file:" + fileContent);
-				fileWriter.write(fileContent + "\n");
-				fileContent = in.readLine();
+			int contentLength = 0;
+			String s, contentLenghtString = "Content-Length: ";
+			while ((s = inputStream.readLine()) != null && s.length() > 0) {
+				System.out.println("READ: " + s);
+				if (s.contains(contentLenghtString)) {
+					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
+				}
+				if (s.isEmpty()) {
+					break;
+				}
 			}
+			System.out.println("READ CONTENTLENGTH: " + contentLength);
+
+			char[] buffer = new char[contentLength];
+			int rsz = inputStream.read(buffer, 0, contentLength);
+			if (rsz == contentLength)
+				fileWriter.write(buffer);
+
 			fileWriter.flush();
 			fileWriter.close();
 
-			out.println("HTTP/1.1 200 OK");
-			out.println("Date: " + new Date());
-			out.println("Server: Java HTTP Server");
-			out.println("Content-type: " + getContentType(fileRequested));
-			out.println("Content-length: " + (int) file.length());
-			out.println();
-			out.flush();
+			outputStream.println("HTTP/1.1 200 OK");
+			outputStream.println("Date: " + new Date());
+			outputStream.println("Server: Java HTTP Server");
+			outputStream.println("Content-type: " + getContentTypeOfFile(fileRequested));
+			outputStream.println("Content-length: " + contentLength);
+			outputStream.println();
+			outputStream.flush();
 
 		} else {
 			// TODO: Do we need to return an error?
@@ -169,57 +182,56 @@ public class TCPServer implements Runnable {
 		}
 	}
 
-	private void methodHeadGet(PrintWriter out, BufferedOutputStream dataOut, String fileRequested, boolean isGet)
-			throws IOException {
-		if (fileRequested.endsWith("/")) {
-			fileRequested += DEFAULT_FILE;
-		}
+	private void methodHeadGet(PrintWriter out, BufferedOutputStream dataOut, String fileRequested,
+			boolean isMethodGetRequest) throws IOException {
+		if (fileRequested.equals("/"))
+			fileRequested = DEFAULT_FILE;
 
 		File file = new File(WEB_ROOT, fileRequested);
-		int fileLength = (int) file.length();
-		String content = getContentType(fileRequested);
+		String contentType = getContentTypeOfFile(fileRequested);
+		int contentLength = (int) file.length();
 
-		byte[] fileData = readFileData(file, fileLength);
-
-		out.println("HTTP/1.1 204 OK");
+		out.println("HTTP/1.1 200 OK");
 		out.println("Date: " + new Date());
 		out.println("Server: Java HTTP Server");
-		out.println("Content-type: " + content);
-		out.println("Content-length: " + fileLength);
-		out.println();
+		out.println("Content-type: " + contentType);
+		out.println("Content-length: " + contentLength);
+		out.println("");
 		out.flush();
 
-		if (isGet) {
-			dataOut.write(fileData, 0, fileLength);
+		if (isMethodGetRequest) {
+			byte[] data = readFileData(file, contentLength);
+			dataOut.write(data, 0, contentLength);
 			dataOut.flush();
 		}
 
 		if (verbose) {
-			System.out.print(isGet ? "GET" : "HEAD");
-			System.out.println(": File " + fileRequested + " of type " + content + " returned");
+			System.out.print(isMethodGetRequest ? "GET" : "HEAD");
+			System.out.println(": File " + fileRequested + " of type " + contentType + " returned");
 		}
-
 	}
 
 	private byte[] readFileData(File file, int fileLength) throws IOException {
-		FileInputStream fileIn = null;
+		FileInputStream fileInpuStream = null;
 		byte[] fileData = new byte[fileLength];
 
 		try {
-			fileIn = new FileInputStream(file);
-			fileIn.read(fileData);
+			fileInpuStream = new FileInputStream(file);
+			fileInpuStream.read(fileData);
 		} finally {
-			if (fileIn != null)
-				fileIn.close();
+			if (fileInpuStream != null)
+				fileInpuStream.close();
 		}
-
 		return fileData;
 	}
 
-	// return supported MIME Types
-	private String getContentType(String fileRequested) {
-		if (fileRequested.endsWith(".htm") || fileRequested.endsWith(".html"))
+	private String getContentTypeOfFile(String fileRequested) {
+		if (fileRequested.endsWith(".html"))
 			return "text/html";
+		else if (fileRequested.endsWith(".jpg"))
+			return "image/jpeg";
+		else if (fileRequested.endsWith(".ico"))
+			return "image/icon";
 		else
 			return "text/plain";
 	}
@@ -270,57 +282,69 @@ public class TCPServer implements Runnable {
 		dataOut.write(fileData, 0, fileLength);
 		dataOut.flush();
 	}
-
 }
-
-/*
- * import java.io.*; import java.net.*; import java.util.Date;
- * 
- * class TCPServer { public final static int PORT = 6782;
- * 
- * public static void main(String argv[]) throws Exception { int counter = 0;
- * 
- * ServerSocket welcomeSocket = new ServerSocket(PORT);
- * System.out.println("Server started!");
- * 
- * while (true) { Socket clientSocket = welcomeSocket.accept(); counter++;
- * System.err.println("New client connected! Count: " + counter + "\n\n\n");
- * 
- * BufferedReader in = new BufferedReader(new
- * InputStreamReader(clientSocket.getInputStream())); BufferedWriter out = new
- * BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
- * 
- * System.out.println(in); System.out.println(out);
- * 
- * String s; /*while ((s = in.readLine()) != null && s.length() > 0) {
- * System.out.println(s); if (s.isEmpty()) { break; } }
- * 
- * Date date = new Date();
- * 
- * out.write("HTTP/1.0 200 OK\r\n"); out.write("Date: " + date + "\r\n");
- * out.write("Server: Apache/0.8.4\r\n");
- * out.write("Content-Type: text/html\r\n");
- * out.write("Content-Length: 59\r\n");
- * out.write("Expires: Sat, 01 Jan 2050 00:59:59 GMT\r\n");
- * out.write("Last-modified: Fri, 09 Aug 2010 14:21:40 GMT\r\n");
- * out.write("\r\n"); out.write("<TITLE>Example</TITLE>");
- * out.write("<P>Ceci n'est pas une page</P>");
- * 
- * System.err.println("Connection closed"); out.close(); in.close();
- * clientSocket.close(); } } }
- * 
- * /* while (true) { Socket connectionSocket = welcomeSocket.accept();
- * BufferedReader inFromClient = new BufferedReader(new
- * InputStreamReader(connectionSocket.getInputStream())); DataOutputStream
- * outToClient = new DataOutputStream(connectionSocket.getOutputStream());
- * String clientSentence = inFromClient.readLine();
- * System.out.println("Received: " + clientSentence); String output =
- * clientSentence.toUpperCase() + '\n';
- * 
- * 
- * 
- * 
- * outToClient.writeBytes(output); System.out.println("Server end of wile");
- * 
- * }
- */
+//}
+//import java.io.*;
+//import java.net.*;
+//import java.util.Date;
+//
+//class TCPServer {
+//	public final static int PORT = 8085;
+//
+//	public static void main(String argv[]) throws Exception {
+//		int counter = 0;
+//
+//		ServerSocket welcomeSocket = new ServerSocket(PORT);
+//		System.out.println("Server started!");
+//
+//		while (true) {
+//			Socket clientSocket = welcomeSocket.accept();
+//			counter++;
+//			System.err.println("New client connected! Count: " + counter + "\n\n\n");
+//
+//			BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+//			BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+//
+//			System.out.println(in);
+//			System.out.println(out);
+//
+//			String s;
+//			while ((s = in.readLine()) != null && s.length() > 0) {
+//				System.out.println(s);
+//				if (s.isEmpty()) {
+//					break;
+//				}
+//			}
+//
+//			Date date = new Date();
+//
+//			out.write("HTTP/1.0 200 OK\r\n");
+//			out.write("Date: " + date + "\r\n");
+//			out.write("Server: Apache/0.8.4\r\n");
+//			out.write("Content-Type: text/html\r\n");
+//			out.write("Content-Length: 59\r\n");
+//			out.write("Expires: Sat, 01 Jan 2050 00:59:59 GMT\r\n");
+//			out.write("Last-modified: Fri, 09 Aug 2010 14:21:40 GMT\r\n");
+//			out.write("\r\n");
+//			out.write("<TITLE>Example</TITLE>");
+//			out.write("<P>Ceci n'est pas une page</P>");
+//			out.flush();
+//
+//			System.err.println("Connection closed");
+//			out.close();
+//			in.close();
+//			clientSocket.close();
+//		}
+////		while (true) {
+////			Socket connectionSocket = welcomeSocket.accept();
+////			BufferedReader inFromClient = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
+////			DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
+////			String clientSentence = inFromClient.readLine();
+////			System.out.println("Received: " + clientSentence);
+////			String output = clientSentence.toUpperCase() + '\n';
+////		}
+////  
+//	}
+////  outToClient.writeBytes(output); System.out.println("Server end of wile");
+//
+//}
