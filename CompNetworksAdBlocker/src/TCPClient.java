@@ -5,61 +5,50 @@ import java.util.Arrays;
 import java.util.List;
 
 class TCPClient {
-//	private String HTTPMETHOD = null;
-//	private String URI = null;
-//	private static int PORT = 80;
-//	private String restARGS = null;
-//	
-//	
-//	public void parseArguments(String argv[]) {
-//		if (argv.length == 0) System.out.println("There are no arguments passed.");
-//		try {
-//			HTTPMETHOD = argv[0];
-//			System.out.println("method " + HTTPMETHOD);
-//			URI = argv[1];
-//			System.out.println("uri " + URI);
-//			PORT = Integer.parseInt(argv[2]);
-//			System.out.println("port " + PORT);
-//			
-//			for (int i=3; i < argv.length; i++) {
-//				restARGS = argv[i];
-//				System.out.println("resting args " + argv[i]);
-//			}
-//		} catch (Exception e) {
-//			// TODO: handle exception
-//		}
-//		
-//	}
+	private String HTTPMETHOD = null;
+	private URL URL = null;
+	private int PORT = 80;
+	private String restARGS = null;
+	private String HOSTNAME;
+	private List<String> httpMethods = Arrays.asList("GET", "HEAD", "POST", "PUT");
 	
-
-	public static void main(String[] args) throws UnknownHostException, IOException {
-		if (args.length < 1) return;
-
-		
-		String HTTPMethod = "GET";
-		URL url;
-		String hostname;
+	
+	public void parseParam(String[] args) throws Exception {
+		if (args.length == 0) System.out.println("There are no arguments passed.");
+		this.HTTPMETHOD = args[0];
 		try {
-			url = new URL(args[0]);
-			hostname = url.getHost();
-		} catch (MalformedURLException ex) {
-			ex.printStackTrace();
-			return;
+			
+//			if(httpMethods.contains(HTTPMETHOD)) throw new IllegalArgumentException("method not supported");
+//			System.out.println("method " + HTTPMETHOD);
+			String myUrl = args[1];
+			if(!myUrl.contains("http://") || !myUrl.contains("https://")) myUrl = "http://"+myUrl;
+			this.URL = new URL(myUrl);
+			
+		} catch (Exception e) {
+			throw new Exception("help");
 		}
+		
+		this.HOSTNAME = URL.getHost();
+		System.out.println("url" + URL);
+		this.PORT = Integer.parseInt(args[2]);
+		System.out.println("port " + PORT);
+		
+		for (int i=3; i < args.length; i++) {
+			restARGS = args[i];
+			System.out.println("resting args " + args[i]);
+		}
+	}
+	
+	
 	
 
-		//String hostname = url.getHost();
-		int port = 8081;
-		
-		System.out.println("Client started on port: "  + port);
-		
-		
-		
-		
+	public void run() throws UnknownHostException, IOException {
 
-		//BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
+		System.out.println("Client started on port: "  + PORT);
+		System.out.println(this.HOSTNAME);
+		System.out.println(this.PORT);
 		
-		Socket clientSocket = new Socket(hostname, port);
+		Socket clientSocket = new Socket(this.HOSTNAME, this.PORT);
 		OutputStream out = clientSocket.getOutputStream();
 
 		PrintWriter requestWriter = new PrintWriter(out, true);
@@ -68,27 +57,12 @@ class TCPClient {
 		BufferedReader responseReader = new BufferedReader(new InputStreamReader(response));
 		
 
-		
-//		String sentence = inFromUser.readLine();
-		requestWriter.println( HTTPMethod+" "+ url +" HTTP/1.1");
+		requestWriter.println( HTTPMETHOD+" "+ URL +" HTTP/1.1");
 		requestWriter.println();
-		
 
-//		outToServer.writeBytes(sentence + '\n'); 
 		
 		System.out.println("SERVER RESPONSE ---------------");
-//		while(inFromServer.readLine() != null) {
-//			System.out.println(inFromServer.readLine());
-//		}
-		
-		
-//		String responseLine;
-//        while ((responseLine = responseReader.readLine()) != null) {
-//            System.out.println("Server: " + responseLine);
-//            if (responseLine.indexOf("Ok") != -1) {
-//              break;
-//            }
-//        }
+
 		String line;
 		while ((line = responseReader.readLine()) != null) {
 			System.out.println(line);
