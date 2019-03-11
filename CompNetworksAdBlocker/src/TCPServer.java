@@ -3,6 +3,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -14,10 +15,12 @@ import java.util.Date;
 import java.util.StringTokenizer;
 
 public class TCPServer implements Runnable {
-	static final int PORT = 8081;
+	static final int PORT = 8082;
+	private static int connectCounter = 0;
 	private Socket connect;
 
 	static final File WEB_ROOT = new File("webContent/");
+	static final File FILE_ROOT = new File("saveFiles/");
 	static final String DEFAULT_FILE = "index.html"; // 200
 
 	static final String NOT_MODIFIED = "304.html";
@@ -35,15 +38,17 @@ public class TCPServer implements Runnable {
 	public static void main(String[] args) {
 		try {
 			ServerSocket serverConnect = new ServerSocket(PORT);
-			System.out.println("Server started.\nListening for connections on port : " + PORT + " ...\n");
+
+			if (verbose)
+				System.out.println("Server started.\nListening for connections on port : " + PORT + " ...\n");
 
 			while (true) {
 				TCPServer myServer = new TCPServer(serverConnect.accept());
 
 				if (verbose)
-					System.out.println("New connection! (" + new Date() + ")\n");
+					System.out.println(
+							"New connection! (" + new Date() + ") | Connection counter: " + ++connectCounter + "\n");
 
-				// create dedicated thread to manage the client connection
 				Thread thread = new Thread(myServer);
 				thread.start();
 			}
@@ -60,6 +65,7 @@ public class TCPServer implements Runnable {
 		BufferedOutputStream dataOut = null;
 		String fileRequested = null;
 		String method = null;
+		String httpVersion = null;
 
 		try {
 			in = new BufferedReader(new InputStreamReader(connect.getInputStream()));
@@ -69,10 +75,13 @@ public class TCPServer implements Runnable {
 			dataOut = new BufferedOutputStream(connect.getOutputStream());
 
 			// we parse the first line of the request with a string tokenizer
-			StringTokenizer parse = new StringTokenizer(in.readLine());
+			String firstLine = in.readLine();
+			System.out.println(firstLine);
+			StringTokenizer parse = new StringTokenizer(firstLine);
 
 			method = parse.nextToken().toUpperCase();
 			fileRequested = parse.nextToken().toLowerCase();
+			httpVersion = parse.nextToken(); // TODO: Http 505 als foute http versie
 
 			switch (method) {
 			case "HEAD":
@@ -82,8 +91,8 @@ public class TCPServer implements Runnable {
 				methodHeadGet(out, dataOut, fileRequested, true);
 				break;
 			case "PUT":
-				// methodPUT(out, dataOut);
-				break;
+				methodPUT(in, out, dataOut, fileRequested);
+				break;// Create new file
 			case "POST":
 				// methodPOST(out, dataOut);
 				break;
@@ -118,6 +127,48 @@ public class TCPServer implements Runnable {
 
 	}
 
+	private void methodPUT(BufferedReader in, PrintWriter out, BufferedOutputStream dataOut, String fileRequested)
+			throws IOException {
+		File file = new File(FILE_ROOT, fileRequested);
+
+		if (file.createNewFile() || verbose) {
+			if (verbose) {
+				System.out.println("File " + file.getAbsolutePath() + " is created!\n\n");
+				System.out.println("Header of PUT request:");
+			}
+			String line = in.readLine();
+			while (line != null && !line.equals("")) {
+				if (verbose)
+					System.out.println(line);
+				line = in.readLine();
+			}
+
+			FileWriter fileWriter = new FileWriter(file);
+
+			String fileContent = in.readLine();
+			while (fileContent != null && !fileContent.equals("")) {
+				if (verbose)
+					System.out.println("Writing line to file:" + fileContent);
+				fileWriter.write(fileContent + "\n");
+				fileContent = in.readLine();
+			}
+			fileWriter.flush();
+			fileWriter.close();
+
+			out.println("HTTP/1.1 200 OK");
+			out.println("Date: " + new Date());
+			out.println("Server: Java HTTP Server");
+			out.println("Content-type: " + getContentType(fileRequested));
+			out.println("Content-length: " + (int) file.length());
+			out.println();
+			out.flush();
+
+		} else {
+			// TODO: Do we need to return an error?
+			System.out.println("File already exists.");
+		}
+	}
+
 	private void methodHeadGet(PrintWriter out, BufferedOutputStream dataOut, String fileRequested, boolean isGet)
 			throws IOException {
 		if (fileRequested.endsWith("/")) {
@@ -130,18 +181,19 @@ public class TCPServer implements Runnable {
 
 		byte[] fileData = readFileData(file, fileLength);
 
-		out.println("HTTP/1.1 200 OK");
-		out.println("Server: Java HTTP Server");
+		out.println("HTTP/1.1 204 OK");
 		out.println("Date: " + new Date());
+		out.println("Server: Java HTTP Server");
 		out.println("Content-type: " + content);
 		out.println("Content-length: " + fileLength);
+		out.println();
+		out.flush();
 
 		if (isGet) {
-			out.println();
-			out.flush();
-			dataOut.write(fileData, 0, fileLength); //TODO check dit
+			dataOut.write(fileData, 0, fileLength);
 			dataOut.flush();
 		}
+
 		if (verbose) {
 			System.out.print(isGet ? "GET" : "HEAD");
 			System.out.println(": File " + fileRequested + " of type " + content + " returned");
