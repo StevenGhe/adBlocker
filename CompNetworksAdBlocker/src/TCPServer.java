@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.StringTokenizer;
 
 public class TCPServer implements Runnable {
-	static final int PORT = 8085;
+	static final int PORT = 8080;
 	private static int connectCounter = 0;
 	private Socket socket;
 
@@ -90,9 +90,9 @@ public class TCPServer implements Runnable {
 				break;
 			case "PUT":
 				methodPUT(inputStream, outputStream, dataOutputStream, fileRequested);
-				break;// Create new file
+				break;
 			case "POST":
-				 methodPOST(inputStream, outputStream, dataOutputStream, fileRequested);
+//				methodPOST(inputStream, outputStream, dataOutputStream, fileRequested);
 				break;
 			default:
 				methodNotSupported(outputStream, dataOutputStream, method);
@@ -120,29 +120,66 @@ public class TCPServer implements Runnable {
 			}
 
 			if (verbose) {
-				System.out.println("Connection closed.\n");
-				System.out.println("----------------------");
+				System.out.println("Connection closed.");
+				System.out.println("----------------------\n");
 			}
 		}
 
 	}
 
-	private void methodPOST(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOutputStream,
-			String fileRequested) {
-		File file = new File(FILE_ROOT, fileRequested);
-
-		
-	}
+//	private void methodPOST(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOutputStream,
+//			String fileRequested) throws NumberFormatException, IOException {
+//		File file = new File(FILE_ROOT, fileRequested);
+//		if (file.createNewFile()) {
+//			if (verbose)
+//				System.out.println("File not yet found. Creating new file!");
+//
+//			file.delete();
+//			this.methodPUT(inputStream, outputStream, dataOutputStream, fileRequested);
+//		} else {
+//
+//			if (verbose)
+//				System.out.println("Going to edit file " + file.getAbsolutePath());
+//
+//			int contentLength = 0;
+//			String s, contentLenghtString = "Content-Length: ";
+//			while ((s = inputStream.readLine()) != null && s.length() > 0) {
+//				if (s.contains(contentLenghtString))
+//					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
+//
+//				if (s.isEmpty())
+//					break;
+//
+//			}
+//
+//			FileWriter fileWriter = new FileWriter(file, true);
+//
+//			char[] buffer = new char[contentLength];
+//			int rsz = inputStream.read(buffer, 0, contentLength);
+//			if (rsz == contentLength) {
+//				fileWriter.write("APPEND");
+//			}
+//
+//			fileWriter.flush();
+//			fileWriter.close();
+//
+//			outputStream.println("HTTP/1.1 200 OK");
+//			outputStream.println("Date: " + new Date());
+//			outputStream.println("Server: Java HTTP Server");
+//			outputStream.println("Content-type: " + getContentTypeOfFile(fileRequested));
+//			outputStream.println("Content-length: " + contentLength);
+//			outputStream.println();
+//			outputStream.flush();
+//		}
+//	}
 
 	private void methodPUT(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOut,
 			String fileRequested) throws IOException {
 		File file = new File(FILE_ROOT, fileRequested);
 
 		if (file.createNewFile()) {
-			if (verbose) {
+			if (verbose)
 				System.out.println("File " + file.getAbsolutePath() + " is created!\n\n");
-				System.out.println("Header of PUT request:");
-			}
 
 			FileWriter fileWriter = new FileWriter(file);
 			StringBuilder outputBuilder = new StringBuilder();
@@ -150,7 +187,6 @@ public class TCPServer implements Runnable {
 			int contentLength = 0;
 			String s, contentLenghtString = "Content-Length: ";
 			while ((s = inputStream.readLine()) != null && s.length() > 0) {
-				System.out.println("READ: " + s);
 				if (s.contains(contentLenghtString)) {
 					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
 				}
@@ -196,12 +232,13 @@ public class TCPServer implements Runnable {
 		out.println("Server: Java HTTP Server");
 		out.println("Content-type: " + contentType);
 		out.println("Content-length: " + contentLength);
-		out.println("");
+		out.println();
 		out.flush();
 
 		if (isMethodGetRequest) {
 			byte[] data = readFileData(file, contentLength);
 			dataOut.write(data, 0, contentLength);
+			dataOut.write(null);
 			dataOut.flush();
 		}
 
