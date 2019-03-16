@@ -8,16 +8,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.Reader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
-import java.util.StringTokenizer;
 
 public class TCPServer implements Runnable {
-	static final int PORT = 8080;
+	static final int PORT = 8081;
 	private static int connectCounter = 0;
 	private Socket socket;
 
@@ -72,15 +68,34 @@ public class TCPServer implements Runnable {
 
 		try {
 			inputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
 			outputStream = new PrintWriter(socket.getOutputStream());
 			dataOutputStream = new BufferedOutputStream(socket.getOutputStream());
 
 			String[] parsedFirstLine = inputStream.readLine().split(" ");
 			method = parsedFirstLine[0].toUpperCase();
 			fileRequested = parsedFirstLine[1].toLowerCase();
-			httpVersion = parsedFirstLine[2].toUpperCase(); // TODO: Http 505 als foute http versie
+			httpVersion = parsedFirstLine[2].toUpperCase();
 
+			String s, host = null;
+			int contentLength = 0;
+			String hostString = "host:";
+			String contentLenghtString = "Content-Length: ";
+			while ((s = inputStream.readLine()) != null && s.length() > 0) {
+				if (s.contains(hostString)) 
+					host = s.substring(hostString.length());
+				
+				if (s.contains(contentLenghtString))
+					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
+				
+				if (s.isEmpty()) {
+					break;
+				}
+			}
+			System.out.println("READ HOST: " + host);
+			System.out.println("READ Contentlength: " + contentLength);
+			inputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			
+			
 			switch (method) {
 			case "HEAD":
 				methodHeadGet(outputStream, dataOutputStream, fileRequested, false);
@@ -89,10 +104,10 @@ public class TCPServer implements Runnable {
 				methodHeadGet(outputStream, dataOutputStream, fileRequested, true);
 				break;
 			case "PUT":
-				methodPUT(inputStream, outputStream, dataOutputStream, fileRequested);
+				methodPUT(inputStream, outputStream, dataOutputStream, fileRequested, contentLength);
 				break;
 			case "POST":
-//				methodPOST(inputStream, outputStream, dataOutputStream, fileRequested);
+				methodPOST(inputStream, outputStream, dataOutputStream, fileRequested, contentLength);
 				break;
 			default:
 				methodNotSupported(outputStream, dataOutputStream, method);
@@ -127,54 +142,43 @@ public class TCPServer implements Runnable {
 
 	}
 
-//	private void methodPOST(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOutputStream,
-//			String fileRequested) throws NumberFormatException, IOException {
-//		File file = new File(FILE_ROOT, fileRequested);
-//		if (file.createNewFile()) {
-//			if (verbose)
-//				System.out.println("File not yet found. Creating new file!");
-//
-//			file.delete();
-//			this.methodPUT(inputStream, outputStream, dataOutputStream, fileRequested);
-//		} else {
-//
-//			if (verbose)
-//				System.out.println("Going to edit file " + file.getAbsolutePath());
-//
-//			int contentLength = 0;
-//			String s, contentLenghtString = "Content-Length: ";
-//			while ((s = inputStream.readLine()) != null && s.length() > 0) {
-//				if (s.contains(contentLenghtString))
-//					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
-//
-//				if (s.isEmpty())
-//					break;
-//
-//			}
-//
-//			FileWriter fileWriter = new FileWriter(file, true);
-//
-//			char[] buffer = new char[contentLength];
-//			int rsz = inputStream.read(buffer, 0, contentLength);
-//			if (rsz == contentLength) {
-//				fileWriter.write("APPEND");
-//			}
-//
-//			fileWriter.flush();
-//			fileWriter.close();
-//
-//			outputStream.println("HTTP/1.1 200 OK");
-//			outputStream.println("Date: " + new Date());
-//			outputStream.println("Server: Java HTTP Server");
-//			outputStream.println("Content-type: " + getContentTypeOfFile(fileRequested));
-//			outputStream.println("Content-length: " + contentLength);
-//			outputStream.println();
-//			outputStream.flush();
-//		}
-//	}
+	private void methodPOST(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOutputStream,
+			String fileRequested, int contentLength) throws NumberFormatException, IOException {
+		File file = new File(FILE_ROOT, fileRequested);
+		if (file.createNewFile()) {
+			if (verbose)
+				System.out.println("File not yet found. Creating new file!");
+
+			file.delete();
+			this.methodPUT(inputStream, outputStream, dataOutputStream, fileRequested, contentLength);
+		} else {
+
+			if (verbose)
+				System.out.println("Going to edit file " + file.getAbsolutePath());
+
+			FileWriter fileWriter = new FileWriter(file, true);
+
+			char[] buffer = new char[contentLength];
+			int rsz = inputStream.read(buffer, 0, contentLength);
+			if (rsz == contentLength) {
+				fileWriter.write("APPEND");
+			}
+
+			fileWriter.flush();
+			fileWriter.close();
+
+			outputStream.println("HTTP/1.1 200 OK");
+			outputStream.println("Date: " + new Date());
+			outputStream.println("Server: Java HTTP Server");
+			outputStream.println("Content-type: " + getContentTypeOfFile(fileRequested));
+			outputStream.println("Content-length: " + contentLength);
+			outputStream.println();
+			outputStream.flush();
+		}
+	}
 
 	private void methodPUT(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOut,
-			String fileRequested) throws IOException {
+			String fileRequested, int contentLength) throws IOException {
 		File file = new File(FILE_ROOT, fileRequested);
 
 		if (file.createNewFile()) {
@@ -183,18 +187,6 @@ public class TCPServer implements Runnable {
 
 			FileWriter fileWriter = new FileWriter(file);
 			StringBuilder outputBuilder = new StringBuilder();
-
-			int contentLength = 0;
-			String s, contentLenghtString = "Content-Length: ";
-			while ((s = inputStream.readLine()) != null && s.length() > 0) {
-				if (s.contains(contentLenghtString)) {
-					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
-				}
-				if (s.isEmpty()) {
-					break;
-				}
-			}
-			System.out.println("READ CONTENTLENGTH: " + contentLength);
 
 			char[] buffer = new char[contentLength];
 			int rsz = inputStream.read(buffer, 0, contentLength);
@@ -238,7 +230,7 @@ public class TCPServer implements Runnable {
 		if (isMethodGetRequest) {
 			byte[] data = readFileData(file, contentLength);
 			dataOut.write(data, 0, contentLength);
-			dataOut.write(null);
+			dataOut.write(0);
 			dataOut.flush();
 		}
 
