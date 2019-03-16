@@ -37,15 +37,15 @@ public class TCPServer implements Runnable {
 		try {
 			ServerSocket serverConnect = new ServerSocket(PORT);
 
-			if (verbose)
-				System.out.println("Server started.\nListening for connections on port : " + PORT + " ...\n");
+//			if (verbose)
+//				System.out.println("Server started.\nListening for connections on port : " + PORT + " ...\n");
 
 			while (true) {
 				TCPServer myServer = new TCPServer(serverConnect.accept());
 
-				if (verbose)
-					System.out.println(
-							"New connection! (" + new Date() + ") | Connection counter: " + ++connectCounter + "\n");
+//				if (verbose)
+//					System.out.println(
+//							"New connection! (" + new Date() + ") | Connection counter: " + ++connectCounter + "\n");
 
 				Thread thread = new Thread(myServer);
 				thread.start();
@@ -71,31 +71,37 @@ public class TCPServer implements Runnable {
 			outputStream = new PrintWriter(socket.getOutputStream());
 			dataOutputStream = new BufferedOutputStream(socket.getOutputStream());
 
+			//Reading first line
 			String[] parsedFirstLine = inputStream.readLine().split(" ");
 			method = parsedFirstLine[0].toUpperCase();
 			fileRequested = parsedFirstLine[1].toLowerCase();
 			httpVersion = parsedFirstLine[2].toUpperCase();
 
-			String s, host = null;
+			String s = null, connection = null, host = null;
 			int contentLength = 0;
-			String hostString = "host:";
+			String hostString = "Host: ";
 			String contentLenghtString = "Content-Length: ";
+			String keepAlive = "Connection: ";
+			
+			//Reading header
 			while ((s = inputStream.readLine()) != null && s.length() > 0) {
-				if (s.contains(hostString)) 
+				if (s.contains(hostString))
 					host = s.substring(hostString.length());
-				
+
 				if (s.contains(contentLenghtString))
 					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
-				
+
+				if (s.contains(keepAlive)) {
+					connection = s.substring(keepAlive.length());
+				}
 				if (s.isEmpty()) {
 					break;
 				}
 			}
+			System.out.println("READ KEEP ALIVE: " + connection);
 			System.out.println("READ HOST: " + host);
-			System.out.println("READ Contentlength: " + contentLength);
-			inputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-			
-			
+			System.out.println("READ Content length: " + contentLength);
+
 			switch (method) {
 			case "HEAD":
 				methodHeadGet(outputStream, dataOutputStream, fileRequested, false);
@@ -134,10 +140,10 @@ public class TCPServer implements Runnable {
 				System.err.println("Error closing stream : " + e.getMessage());
 			}
 
-			if (verbose) {
-				System.out.println("Connection closed.");
-				System.out.println("----------------------\n");
-			}
+//			if (verbose) {
+//				System.out.println("Connection closed.");
+//				System.out.println("----------------------\n");
+//			}
 		}
 
 	}
@@ -148,32 +154,39 @@ public class TCPServer implements Runnable {
 		if (file.createNewFile()) {
 			if (verbose)
 				System.out.println("File not yet found. Creating new file!");
-
-			file.delete();
 			this.methodPUT(inputStream, outputStream, dataOutputStream, fileRequested, contentLength);
 		} else {
 
 			if (verbose)
-				System.out.println("Going to edit file " + file.getAbsolutePath());
+				System.out.println("Going to edit file " + file.getCanonicalFile());
 
 			FileWriter fileWriter = new FileWriter(file, true);
 
 			char[] buffer = new char[contentLength];
 			int rsz = inputStream.read(buffer, 0, contentLength);
 			if (rsz == contentLength) {
-				fileWriter.write("APPEND");
+				fileWriter.write(buffer);
+				fileWriter.write("\n");
 			}
 
 			fileWriter.flush();
 			fileWriter.close();
 
-			outputStream.println("HTTP/1.1 200 OK");
+			int newContentLength = (int) file.length();
+
+			outputStream.println("HTTP/1.1 201 OK");
 			outputStream.println("Date: " + new Date());
 			outputStream.println("Server: Java HTTP Server");
+			outputStream.println("Location: " + file.getCanonicalFile());
 			outputStream.println("Content-type: " + getContentTypeOfFile(fileRequested));
-			outputStream.println("Content-length: " + contentLength);
+			outputStream.println("Content-length: " + newContentLength);
 			outputStream.println();
 			outputStream.flush();
+			
+			byte[] data = readFileData(file, newContentLength);
+			dataOutputStream.write(data, 0, newContentLength);
+			dataOutputStream.write(0);
+			dataOutputStream.flush();
 		}
 	}
 
@@ -183,26 +196,34 @@ public class TCPServer implements Runnable {
 
 		if (file.createNewFile()) {
 			if (verbose)
-				System.out.println("File " + file.getAbsolutePath() + " is created!\n\n");
+				System.out.println("File " + file.getCanonicalPath() + " is created!\n\n");
 
 			FileWriter fileWriter = new FileWriter(file);
 			StringBuilder outputBuilder = new StringBuilder();
 
 			char[] buffer = new char[contentLength];
-			int rsz = inputStream.read(buffer, 0, contentLength);
-			if (rsz == contentLength)
+			int amtOfCharsRead = inputStream.read(buffer, 0, contentLength);
+
+			if (amtOfCharsRead == contentLength) {
 				fileWriter.write(buffer);
+				fileWriter.write("\n");
+			}
 
 			fileWriter.flush();
 			fileWriter.close();
 
-			outputStream.println("HTTP/1.1 200 OK");
+			outputStream.println("HTTP/1.1 201 CREATED");
 			outputStream.println("Date: " + new Date());
 			outputStream.println("Server: Java HTTP Server");
 			outputStream.println("Content-type: " + getContentTypeOfFile(fileRequested));
 			outputStream.println("Content-length: " + contentLength);
 			outputStream.println();
 			outputStream.flush();
+			
+			byte[] data = readFileData(file, contentLength);
+			dataOut.write(data, 0, contentLength);
+			dataOut.write(0);
+			dataOut.flush();
 
 		} else {
 			// TODO: Do we need to return an error?
@@ -241,15 +262,15 @@ public class TCPServer implements Runnable {
 	}
 
 	private byte[] readFileData(File file, int fileLength) throws IOException {
-		FileInputStream fileInpuStream = null;
+		FileInputStream fileInputStream = null;
 		byte[] fileData = new byte[fileLength];
 
 		try {
-			fileInpuStream = new FileInputStream(file);
-			fileInpuStream.read(fileData);
+			fileInputStream = new FileInputStream(file);
+			fileInputStream.read(fileData);
 		} finally {
-			if (fileInpuStream != null)
-				fileInpuStream.close();
+			if (fileInputStream != null)
+				fileInputStream.close();
 		}
 		return fileData;
 	}
