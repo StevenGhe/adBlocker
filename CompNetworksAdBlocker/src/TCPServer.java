@@ -111,6 +111,7 @@ public class TCPServer implements Runnable {
 
 			// Client does not include host header with HTTP 1.1
 			if (httpVersion.contentEquals("HTTP/1.1") && (host == null || host.isEmpty())) {
+				// 400
 				badRequest(outputStream, dataOutputStream);
 			}
 
@@ -128,8 +129,7 @@ public class TCPServer implements Runnable {
 				methodPOST(inputStream, outputStream, dataOutputStream, fileRequested, contentLength);
 				break;
 			default:
-				System.out.println("HTTP Method not implemented");
-				break;
+				throw new Exception("HTTP Method not supported");
 			}
 
 		} catch (FileNotFoundException e) {
@@ -141,9 +141,10 @@ public class TCPServer implements Runnable {
 				System.err.println("Error with file not found catch : " + e2.getMessage());
 			}
 
-		} catch (IOException | ParseException e) {
+		} catch (Exception e) {
 
 			try {
+				// 500
 				serverError(outputStream, dataOutputStream);
 			} catch (IOException e2) {
 				System.err.println("Error with server error catch : " + e2.getMessage());
@@ -170,6 +171,35 @@ public class TCPServer implements Runnable {
 				System.err.println("Error closing stream : " + e.getMessage());
 			}
 		}
+	}
+
+	private void methodHead(PrintWriter out, String fileRequested) throws ParseException, FileNotFoundException {
+		if (fileRequested.equals("/"))
+			fileRequested = DEFAULT_FILE;
+
+		File file = new File(WEB_ROOT, fileRequested);
+
+		if (!file.exists())
+			throw new FileNotFoundException("File doesn't exist!");
+
+		String contentType = getContentTypeOfFile(fileRequested);
+		int contentLength = (int) file.length();
+
+		SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
+		Date fileDate = format.parse(format.format(file.lastModified()));
+
+		out.println("HTTP/1.1 200 OK");
+		out.println("Date: " + new Date());
+		out.println("Server: Java HTTP Server");
+		out.println("Content-type: " + contentType);
+		out.println("Content-length: " + contentLength);
+		out.println("Last-Modified: " + fileDate);
+		out.println();
+		out.flush();
+
+		if (verbose)
+			System.out.println("HEAD: File " + fileRequested + " of type " + contentType + " returned");
+
 	}
 
 	private void methodPOST(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOutputStream,
@@ -214,6 +244,64 @@ public class TCPServer implements Runnable {
 		}
 	}
 
+	private void methodGet(PrintWriter out, BufferedOutputStream dataOut, String fileRequested, String modifiedTime)
+			throws IOException, ParseException {
+		//index.html & index & / 
+		if (fileRequested.equals("/") || fileRequested.equals("index") )
+			fileRequested = DEFAULT_FILE;
+
+		File file = new File(WEB_ROOT, fileRequested);
+
+		if (!file.exists())
+			throw new FileNotFoundException("File doesn't exist!");
+
+		Date requestDate = null, fileDate = null;
+		
+		//If given a If-Modified-Since header date
+		if (modifiedTime != null) {
+			SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
+
+			requestDate = format.parse(modifiedTime);
+			fileDate = format.parse(format.format(file.lastModified()));
+		}
+
+		//If no If-Modified-Since was given or valid requestDate return 200
+		if (modifiedTime == null || requestDate.after(fileDate)) {
+			out.println("HTTP/1.1 200 OK");
+			out.println("Date: " + new Date());
+			out.println("Server: Java HTTP Server");
+			out.println("Content-type: " + getContentTypeOfFile(fileRequested));
+			out.println("Content-length: " + (int) file.length());
+			out.println("Last-Modified: " + fileDate);
+			out.println();
+			out.flush();
+
+			byte[] data = readFileData(file, (int) file.length());
+			dataOut.write(data, 0, (int) file.length());
+			dataOut.write(0);
+			dataOut.flush();
+
+			if (verbose)
+				System.out.println("GET: File " + fileRequested + " returned");
+
+		} else {
+			//Else return 304
+			out.println("HTTP/1.1 304 NOT MODIFIED");
+			out.println("Date: " + new Date());
+			out.println("Server: Java HTTP Server");
+			out.println("Content-type: " + getContentTypeOfFile(fileRequested));
+			out.println("Content-length: " + (int) file.length());
+			out.println("Last-Modified: " + fileDate);
+			out.println();
+			out.flush();
+
+			if (verbose)
+				System.out.println(
+						"GET: File " + fileRequested + " not returned since modified date wasn't more recent.");
+		}
+
+	}
+
 	private void methodPUT(BufferedReader inputStream, PrintWriter outputStream, BufferedOutputStream dataOut,
 			String fileRequested, int contentLength) throws IOException {
 		File file = new File(FILE_ROOT, fileRequested);
@@ -253,93 +341,6 @@ public class TCPServer implements Runnable {
 			// TODO: Do we need to return an error?
 			System.out.println("File already exists.");
 		}
-	}
-
-	private void methodGet(PrintWriter out, BufferedOutputStream dataOut, String fileRequested, String modifiedTime)
-			throws IOException, ParseException {
-		if (fileRequested.equals("/"))
-			fileRequested = DEFAULT_FILE;
-
-		File file = new File(WEB_ROOT, fileRequested);
-
-		if (!file.exists())
-			throw new FileNotFoundException("File doesn't exist!");
-
-		String contentType = getContentTypeOfFile(fileRequested);
-		int contentLength = (int) file.length();
-
-		Date requestDate = null, fileDate = null;
-		if (modifiedTime != null) {
-			SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
-
-			requestDate = format.parse(modifiedTime);
-			fileDate = format.parse(format.format(file.lastModified()));
-		}
-
-		if (modifiedTime == null || requestDate.after(fileDate)) {
-
-			out.println("HTTP/1.1 200 OK");
-			out.println("Date: " + new Date());
-			out.println("Server: Java HTTP Server");
-			out.println("Content-type: " + contentType);
-			out.println("Content-length: " + contentLength);
-			out.println("Last-Modified: " + fileDate);
-			out.println();
-			out.flush();
-
-			byte[] data = readFileData(file, contentLength);
-			dataOut.write(data, 0, contentLength);
-			dataOut.write(0);
-			dataOut.flush();
-
-			if (verbose)
-				System.out.println("GET: File " + fileRequested + " of type " + contentType + " returned");
-
-		} else {
-
-			out.println("HTTP/1.1 304 NOT MODIFIED");
-			out.println("Date: " + new Date());
-			out.println("Server: Java HTTP Server");
-			out.println("Content-type: " + contentType);
-			out.println("Content-length: " + contentLength);
-			out.println("Last-Modified: " + fileDate);
-			out.println();
-			out.flush();
-
-			if (verbose)
-				System.out.println(
-						"GET: File " + fileRequested + " not returned since modified date wasn't more recent.");
-		}
-
-	}
-
-	private void methodHead(PrintWriter out, String fileRequested) throws ParseException, FileNotFoundException {
-		if (fileRequested.equals("/"))
-			fileRequested = DEFAULT_FILE;
-
-		File file = new File(WEB_ROOT, fileRequested);
-
-		if (!file.exists())
-			throw new FileNotFoundException("File doesn't exist!");
-
-		String contentType = getContentTypeOfFile(fileRequested);
-		int contentLength = (int) file.length();
-
-		SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
-		Date fileDate = format.parse(format.format(file.lastModified()));
-
-		out.println("HTTP/1.1 200 OK");
-		out.println("Date: " + new Date());
-		out.println("Server: Java HTTP Server");
-		out.println("Content-type: " + contentType);
-		out.println("Content-length: " + contentLength);
-		out.println("Last-Modified: " + fileDate);
-		out.println();
-		out.flush();
-
-		if (verbose)
-			System.out.println("HEAD: File " + fileRequested + " of type " + contentType + " returned");
-
 	}
 
 	private void badRequest(PrintWriter out, OutputStream dataOut) throws IOException {
