@@ -142,7 +142,7 @@ public class TCPServer implements Runnable {
 			}
 
 		} catch (IOException | ParseException e) {
-			
+
 			try {
 				serverError(outputStream, dataOutputStream);
 			} catch (IOException e2) {
@@ -261,6 +261,10 @@ public class TCPServer implements Runnable {
 			fileRequested = DEFAULT_FILE;
 
 		File file = new File(WEB_ROOT, fileRequested);
+
+		if (!file.exists())
+			throw new FileNotFoundException("File doesn't exist!");
+
 		String contentType = getContentTypeOfFile(fileRequested);
 		int contentLength = (int) file.length();
 
@@ -309,11 +313,15 @@ public class TCPServer implements Runnable {
 
 	}
 
-	private void methodHead(PrintWriter out, String fileRequested) throws ParseException {
+	private void methodHead(PrintWriter out, String fileRequested) throws ParseException, FileNotFoundException {
 		if (fileRequested.equals("/"))
 			fileRequested = DEFAULT_FILE;
 
 		File file = new File(WEB_ROOT, fileRequested);
+
+		if (!file.exists())
+			throw new FileNotFoundException("File doesn't exist!");
+
 		String contentType = getContentTypeOfFile(fileRequested);
 		int contentLength = (int) file.length();
 
@@ -350,17 +358,17 @@ public class TCPServer implements Runnable {
 		out.println("Content-length: " + fileLength);
 		out.println();
 		out.flush();
-		
+
 		dataOut.write(fileData, 0, fileLength);
 		dataOut.write(0);
 		dataOut.flush();
 	}
-	
-	private void serverError(PrintWriter out, OutputStream dataOut)throws IOException  {
+
+	private void serverError(PrintWriter out, OutputStream dataOut) throws IOException {
 		if (verbose) {
 			System.out.println("HTTP 500 SERVER ERROR");
-		}	
-		
+		}
+
 		File file = new File(WEB_ROOT, SERVER_ERROR);
 		int fileLength = (int) file.length();
 		byte[] fileData = readFileData(file, fileLength);
@@ -372,11 +380,11 @@ public class TCPServer implements Runnable {
 		out.println("Content-length: " + fileLength);
 		out.println();
 		out.flush();
-		
+
 		dataOut.write(fileData, 0, fileLength);
 		dataOut.write(0);
 		dataOut.flush();
-		
+
 	}
 
 	private byte[] readFileData(File file, int fileLength) throws IOException {
@@ -409,13 +417,13 @@ public class TCPServer implements Runnable {
 		int fileLength = (int) file.length();
 		byte[] fileData = readFileData(file, fileLength);
 
-		out.println("HTTP/1.1 404 File Not Found");
+		out.println("HTTP/1.1 404 NOT FOUND");
 		out.println("Server: Java HTTP Server");
 		out.println("Date: " + new Date());
 		out.println("Content-type: text/html");
 		out.println("Content-length: " + fileLength);
 		out.println();
-		out.flush(); 
+		out.flush();
 
 		dataOut.write(fileData, 0, fileLength);
 		dataOut.write(0);
