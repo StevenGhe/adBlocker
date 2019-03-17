@@ -9,10 +9,10 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
+//import org.jsoup.Jsoup;
+//import org.jsoup.nodes.Document;
+//import org.jsoup.nodes.Element;
+//import org.jsoup.select.Elements;
 
 class TCPClient {
 	private String HTTPMETHOD = null;
@@ -125,76 +125,71 @@ class TCPClient {
 
 			System.out.println("SERVER RESPONSE ---------------");
 
-			writer = new PrintWriter("html.tmp", "UTF-8");
+//			writer = new PrintWriter("html.tmp", "UTF-8");
 
 			String line;
-//			// werkt op alles behalve localhost
-//			while ((line = responseReader.readLine()) != null ) {
-//				System.out.println(line);
-//				writer.println(line);
-//				
-//			}
-
-			// werkt niet op google.com
-//			int charbyte;
-//		    StringBuilder strbuilder = new StringBuilder();
-//
-//			    while ((charbyte = responseReader.read()) != 0){
-//			        strbuilder.append(Character.toChars(charbyte));
-//			    }
-//			    System.out.println(strbuilder.toString());
 			String contentLenghtString = "Content-Length: ";
 			String transferEncoding = "Transfer-Encoding: ";
 			boolean chunkSet = false;
 			int contentlength = -1;
+
 			while ((line = responseReader.readLine()) != null && line.length() > 0) { // whileloop header
-				System.out.println(line);
+//				System.out.println(line);
 				if (line.contains(contentLenghtString))
 					contentlength = Integer.parseInt(line.substring(contentLenghtString.length()));
-				if (line.contains(transferEncoding)) {
+				if (line.contains(transferEncoding))
 					chunkSet = line.substring(transferEncoding.length()).equals("chunked");
-				}
-
 			}
+			
+			File file = new File(new File("clientFiles/"), "html.tmp");
+			file.createNewFile();
+
+			FileWriter fileWriter = new FileWriter(file);
+			fileWriter.write("");
+			fileWriter.close();
+			fileWriter = new FileWriter(file, true);
+
+			char[] buffer;
+
 			if (chunkSet) {
-				int chunkAsDec = 0;
+				int chunkLength = 0;
+
 				do {
+					chunkLength = Integer.parseInt(responseReader.readLine(), 16);
 
-					String chunkSize = responseReader.readLine();
-					chunkAsDec = Integer.parseInt(chunkSize, 16);
-					if (chunkAsDec > 0) {
+					if (chunkLength > 0) {
+						System.out.println("ChunksizeInDec= " + chunkLength);
 
-						System.out.println(chunkAsDec);
+						buffer = new char[chunkLength];
+						int offset = 0;
 
-						char[] buffer = new char[chunkAsDec];
-						int bytesRead;
-						int totalLength = 0;
+						while (offset < chunkLength) {
+							System.out.println("BYTESREAD: " + offset);
+							int amountRead = responseReader.read(buffer, offset, chunkLength - offset);
 
-//			        System.out.println(" conte " +contentlength);
-						int rsz = responseReader.read(buffer, 0, chunkAsDec);
-						System.err.println(" srzzzz " + rsz);
+							if (amountRead < 0)
+								break;
 
-						writer.println(buffer);
-						System.out.println(" buff " +buffer);
+							System.err.println("AmtRead= " + amountRead);
 
+							fileWriter.write(buffer);
+
+							offset += amountRead;
+						}
+						responseReader.read();
+						responseReader.read();
 					}
-				} while (chunkAsDec > 0);
-
+					System.out.println("chunk read@@@@@@@@@@@@@@@@@@@\n");
+				} while (chunkLength > 0);
+				fileWriter.close();
 			}
 
 			else {
-				System.out.println(" conte " + contentlength);
-				char[] buffer = new char[contentlength];
-				int bytesRead;
-				int totalLength = 0;
-
-//		        System.out.println(" conte " +contentlength);
-				int rsz = responseReader.read(buffer, 0, contentlength);
-				System.err.println("xx");
-				if (rsz == contentlength) {
-
-					System.out.println(buffer);
-					writer.println(buffer);
+				buffer = new char[contentlength];
+	
+				int amountRead = responseReader.read(buffer, 0, contentlength);
+				if (amountRead == contentlength) {
+					fileWriter.write(buffer);
 				}
 			}
 
@@ -205,7 +200,7 @@ class TCPClient {
 			System.out.println("Client closed!");
 
 		} catch (Exception e) {
-
+			e.printStackTrace();
 		}
 	}
 
@@ -217,18 +212,18 @@ class TCPClient {
 			changedHostname = "http://localhost:" + this.PORT;
 
 		}
-		Document doc = Jsoup.parse(input, "UTF-8", changedHostname);
-		Elements img = doc.getElementsByTag("img");
-		for (Element el : img) {
-			String src = el.absUrl("src");
-//			System.out.println("Image Found!");
-//			System.out.println("src attribute is : "+src);
+//		Document doc = Jsoup.parse(input, "UTF-8", changedHostname);
+//		Elements img = doc.getElementsByTag("img");
+//		for (Element el : img) {
+//			String src = el.absUrl("src");
+////			System.out.println("Image Found!");
+////			System.out.println("src attribute is : "+src);
+//
+////			System.out.println(src.getClass());
+//			objectTodDownload.add(src.toString());
 
-//			System.out.println(src.getClass());
-			objectTodDownload.add(src.toString());
-
-		}
-		;
+//		}
+//		;
 
 	}
 }
