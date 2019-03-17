@@ -131,16 +131,16 @@ class TCPClient {
 			String contentLenghtString = "Content-Length: ";
 			String transferEncoding = "Transfer-Encoding: ";
 			boolean chunkSet = false;
-			int contentlength = -1;
+			int contentLength = -1;
 
 			while ((line = responseReader.readLine()) != null && line.length() > 0) { // whileloop header
 //				System.out.println(line);
 				if (line.contains(contentLenghtString))
-					contentlength = Integer.parseInt(line.substring(contentLenghtString.length()));
+					contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
 				if (line.contains(transferEncoding))
 					chunkSet = line.substring(transferEncoding.length()).equals("chunked");
 			}
-			
+
 			File file = new File(new File("clientFiles/"), "html.tmp");
 			file.createNewFile();
 
@@ -173,6 +173,7 @@ class TCPClient {
 							System.err.println("AmtRead= " + amountRead);
 
 							fileWriter.write(buffer);
+							System.out.println("GET CHUNKRESULT = " + String.valueOf(buffer));
 
 							offset += amountRead;
 						}
@@ -181,16 +182,18 @@ class TCPClient {
 					}
 					System.out.println("chunk read@@@@@@@@@@@@@@@@@@@\n");
 				} while (chunkLength > 0);
-				
+
 				fileWriter.flush();
 				fileWriter.close();
 			}
 
 			else {
-				buffer = new char[contentlength];
-	
-				int amountRead = responseReader.read(buffer, 0, contentlength);
-				if (amountRead == contentlength) {
+				System.out.println(contentLength);
+				buffer = new char[contentLength];
+
+				int amountRead = responseReader.read(buffer, 0, contentLength);
+				if (amountRead == contentLength) {
+					System.out.println("GET RESULT = " + String.valueOf(buffer));
 					fileWriter.write(buffer);
 					fileWriter.write("\n");
 				}

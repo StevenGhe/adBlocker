@@ -198,8 +198,8 @@ public class TCPServer implements Runnable {
 		out.println("HTTP/1.1 200 OK");
 		out.println("Date: " + new Date());
 		out.println("Server: Java HTTP Server");
-		out.println("Content-type: " + contentType);
-		out.println("Content-length: " + contentLength);
+		out.println("Content-Type: " + contentType);
+		out.println("Content-Length: " + contentLength);
 		out.println("Last-Modified: " + fileDate);
 		out.println();
 		out.flush();
@@ -239,8 +239,8 @@ public class TCPServer implements Runnable {
 			outputStream.println("Date: " + new Date());
 			outputStream.println("Server: Java HTTP Server");
 			outputStream.println("Location: " + file.getCanonicalFile());
-			outputStream.println("Content-type: " + getContentTypeOfFile(fileRequested));
-			outputStream.println("Content-length: " + newContentLength);
+			outputStream.println("Content-Type: " + getContentTypeOfFile(fileRequested));
+			outputStream.println("Content-Length: " + newContentLength);
 			outputStream.println();
 			outputStream.flush();
 
@@ -277,8 +277,8 @@ public class TCPServer implements Runnable {
 			out.println("HTTP/1.1 200 OK");
 			out.println("Date: " + new Date());
 			out.println("Server: Java HTTP Server");
-			out.println("Content-type: " + getContentTypeOfFile(fileRequested));
-			out.println("Content-length: " + (int) file.length());
+			out.println("Content-Type: " + getContentTypeOfFile(fileRequested));
+			out.println("Content-Length: " + (int) file.length());
 			out.println("Last-Modified: " + fileDate);
 			out.println();
 			out.flush();
@@ -296,8 +296,8 @@ public class TCPServer implements Runnable {
 			out.println("HTTP/1.1 304 NOT MODIFIED");
 			out.println("Date: " + new Date());
 			out.println("Server: Java HTTP Server");
-			out.println("Content-type: " + getContentTypeOfFile(fileRequested));
-			out.println("Content-length: " + (int) file.length());
+			out.println("Content-Type: " + getContentTypeOfFile(fileRequested));
+			out.println("Content-Length: " + (int) file.length());
 			out.println("Last-Modified: " + fileDate);
 			out.println();
 			out.flush();
@@ -334,8 +334,8 @@ public class TCPServer implements Runnable {
 			outputStream.println("HTTP/1.1 201 CREATED");
 			outputStream.println("Date: " + new Date());
 			outputStream.println("Server: Java HTTP Server");
-			outputStream.println("Content-type: " + getContentTypeOfFile(fileRequested));
-			outputStream.println("Content-length: " + contentLength);
+			outputStream.println("Content-Type: " + getContentTypeOfFile(fileRequested));
+			outputStream.println("Content-Length: " + contentLength);
 			outputStream.println();
 			outputStream.flush();
 
@@ -362,8 +362,8 @@ public class TCPServer implements Runnable {
 		out.println("HTTP/1.1 400 BAD REQUEST");
 		out.println("Server: Java HTTP Server");
 		out.println("Date: " + new Date());
-		out.println("Content-type: text/html");
-		out.println("Content-length: " + fileLength);
+		out.println("Content-Type: text/html");
+		out.println("Content-Length: " + fileLength);
 		out.println();
 		out.flush();
 
@@ -384,8 +384,8 @@ public class TCPServer implements Runnable {
 		out.println("HTTP/1.1 500 SERVER ERROR");
 		out.println("Server: Java HTTP Server");
 		out.println("Date: " + new Date());
-		out.println("Content-type: text/html");
-		out.println("Content-length: " + fileLength);
+		out.println("Content-Type: text/html");
+		out.println("Content-Length: " + fileLength);
 		out.println();
 		out.flush();
 
@@ -428,8 +428,8 @@ public class TCPServer implements Runnable {
 		out.println("HTTP/1.1 404 NOT FOUND");
 		out.println("Server: Java HTTP Server");
 		out.println("Date: " + new Date());
-		out.println("Content-type: text/html");
-		out.println("Content-length: " + fileLength);
+		out.println("Content-Type: text/html");
+		out.println("Content-Length: " + fileLength);
 		out.println();
 		out.flush();
 
