@@ -27,73 +27,6 @@ class TCPClient {
 	private BufferedReader responseReader;
 	private InputStream response;
 
-	public void parseParam(String[] args) throws Exception {
-		if (args.length == 0)
-			System.out.println("There are no arguments passed.");
-		this.HTTPMETHOD = args[0];
-		try {
-
-//			if(httpMethods.contains(HTTPMETHOD)) throw new IllegalArgumentException("method not supported");
-//			System.out.println("method " + HTTPMETHOD);
-			String myUrl = args[1];
-			if (!myUrl.contains("http://") && !myUrl.contains("https://"))
-				myUrl = "http://" + myUrl;
-			this.URL = new URL(myUrl);
-
-		} catch (Exception e) {
-			throw new Exception("help");
-		}
-
-		this.HOSTNAME = URL.getHost();
-		this.PORT = Integer.parseInt(args[2]);
-
-		for (int i = 3; i < args.length; i++) {
-			restARGS = args[i];
-			System.out.println("resting args " + args[i]);
-		}
-	}
-
-	public void download() throws Exception {
-
-		Image image = null;
-
-		try {
-			for (String obj : objectTodDownload) {
-				URL url = new URL(obj);
-
-				System.out.println(url);
-
-				System.out.println(HTTPMETHOD + " " + obj + " HTTP/1.1");
-				requestWriter.println(HTTPMETHOD + " " + obj + " HTTP/1.1");
-				requestWriter.println("HOST:" + HOSTNAME);
-				requestWriter.println();
-
-				System.out.println("SERVER RESPONSE ---DOWNLOADING-IMAGES---");
-				String line;
-				OutputStream dos;
-				String[] parts = obj.toString().split("/");
-				String fileName = parts[parts.length - 1];
-				dos = new FileOutputStream(fileName);
-				int count;
-				byte[] buffer = new byte[2048];
-				while ((count = response.read(buffer)) != -1) {
-					dos.write(buffer, 0, count);
-					dos.flush();
-				}
-				dos.close();
-
-//			    
-//			    File outputfile = new File(fileName);
-//
-//
-//			    ImageIO.write((RenderedImage)  image, "jpg", outputfile);
-			}
-			System.out.println("Images successfully stored locally.");
-		} catch (IOException e) {
-			System.err.println("Failed saving the images");
-		}
-	};
-
 	public void run() throws Exception {
 
 		System.out.println("Client started on port: " + PORT);
@@ -113,19 +46,17 @@ class TCPClient {
 			InputStreamReader responseStream = new InputStreamReader(response);
 			responseReader = new BufferedReader(responseStream);
 			String path = URL.getPath();
-			if (path == "") {
-				System.err.println("No path specified -> root ");
+			
+			if (path == "") 
 				path = "/";
-			}
+			
 			requestWriter.println(HTTPMETHOD + " " + path + " HTTP/1.1");
 			requestWriter.println("Host: " + HOSTNAME);
-			System.out.println("Host: " + HOSTNAME);
 			requestWriter.println();
 			requestWriter.flush();
 
 			System.out.println("SERVER RESPONSE ---------------");
 
-//			writer = new PrintWriter("html.tmp", "UTF-8");
 
 			String line;
 			String contentLenghtString = "Content-Length: ";
@@ -133,10 +64,11 @@ class TCPClient {
 			boolean chunkSet = false;
 			int contentLength = -1;
 
-			while ((line = responseReader.readLine()) != null && line.length() > 0) { // whileloop header
-//				System.out.println(line);
+			//Read header data
+			while ((line = responseReader.readLine()) != null && line.length() > 0) {
 				if (line.contains(contentLenghtString))
 					contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
+				
 				if (line.contains(transferEncoding))
 					chunkSet = line.substring(transferEncoding.length()).equals("chunked");
 			}
@@ -211,6 +143,74 @@ class TCPClient {
 			e.printStackTrace();
 		}
 	}
+	
+	public void parseParam(String[] args) throws Exception {
+		if (args.length == 0)
+			System.out.println("There are no arguments passed.");
+		this.HTTPMETHOD = args[0];
+		try {
+
+//			if(httpMethods.contains(HTTPMETHOD)) throw new IllegalArgumentException("method not supported");
+//			System.out.println("method " + HTTPMETHOD);
+			String myUrl = args[1];
+			if (!myUrl.contains("http://") && !myUrl.contains("https://"))
+				myUrl = "http://" + myUrl;
+			this.URL = new URL(myUrl);
+
+		} catch (Exception e) {
+			throw new Exception("help");
+		}
+
+		this.HOSTNAME = URL.getHost();
+		this.PORT = Integer.parseInt(args[2]);
+
+		for (int i = 3; i < args.length; i++) {
+			restARGS = args[i];
+			System.out.println("resting args " + args[i]);
+		}
+	}
+
+	public void download() throws Exception {
+
+		Image image = null;
+
+		try {
+			for (String obj : objectTodDownload) {
+				URL url = new URL(obj);
+
+				System.out.println(url);
+
+				System.out.println(HTTPMETHOD + " " + obj + " HTTP/1.1");
+				requestWriter.println(HTTPMETHOD + " " + obj + " HTTP/1.1");
+				requestWriter.println("HOST:" + HOSTNAME);
+				requestWriter.println();
+
+				System.out.println("SERVER RESPONSE ---DOWNLOADING-IMAGES---");
+				String line;
+				OutputStream dos;
+				String[] parts = obj.toString().split("/");
+				String fileName = parts[parts.length - 1];
+				dos = new FileOutputStream(fileName);
+				int count;
+				byte[] buffer = new byte[2048];
+				while ((count = response.read(buffer)) != -1) {
+					dos.write(buffer, 0, count);
+					dos.flush();
+				}
+				dos.close();
+
+//			    
+//			    File outputfile = new File(fileName);
+//
+//
+//			    ImageIO.write((RenderedImage)  image, "jpg", outputfile);
+			}
+			System.out.println("Images successfully stored locally.");
+		} catch (IOException e) {
+			System.err.println("Failed saving the images");
+		}
+	};
+
 
 	public void parseHtml() throws IOException {
 		objectTodDownload = new ArrayList<>();
@@ -231,7 +231,6 @@ class TCPClient {
 //			objectTodDownload.add(src.toString());
 
 //		}
-//		;
 
 	}
 }
