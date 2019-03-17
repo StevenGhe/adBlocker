@@ -38,9 +38,11 @@ public class TCPServer implements Runnable {
 		socket.setKeepAlive(true);
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
+		ServerSocket serverConnect = null;
+
 		try {
-			ServerSocket serverConnect = new ServerSocket(PORT);
+			serverConnect = new ServerSocket(PORT);
 			if (verbose)
 				System.out.println("Server started.\nListening for connections on port : " + PORT + " ...\n");
 
@@ -56,6 +58,8 @@ public class TCPServer implements Runnable {
 
 		} catch (IOException e) {
 			System.err.println("Server Connection error : " + e.getMessage());
+		} finally {
+			serverConnect.close();
 		}
 	}
 
@@ -110,9 +114,8 @@ public class TCPServer implements Runnable {
 			}
 
 			// Client does not include host header with HTTP 1.1
-			if (httpVersion.contentEquals("HTTP/1.1") && (host == null || host.isEmpty())) {
-				// 400
-				badRequest(outputStream, dataOutputStream);
+			if (httpVersion.equals("HTTP/1.1") && (host == null || host.isEmpty())) {
+				throw new Exception("400 Bad request");
 			}
 
 			switch (method) {
@@ -129,7 +132,7 @@ public class TCPServer implements Runnable {
 				methodPOST(inputStream, outputStream, dataOutputStream, fileRequested, contentLength);
 				break;
 			default:
-				throw new Exception("HTTP Method not supported");
+				throw new Exception("500 HTTP Method not supported");
 			}
 
 		} catch (FileNotFoundException e) {
@@ -142,19 +145,24 @@ public class TCPServer implements Runnable {
 			}
 
 		} catch (Exception e) {
-
 			try {
-				// 500
-				serverError(outputStream, dataOutputStream);
+
+				if (e.getMessage().contains("400")) {
+					badRequest(outputStream, dataOutputStream);
+				} else {
+					// 500
+					serverError(outputStream, dataOutputStream);
+				}
 			} catch (IOException e2) {
 				System.err.println("Error with server error catch : " + e2.getMessage());
 			}
 		} finally {
 			try {
+				inputStream.close();
+				outputStream.close();
+				dataOutputStream.close();
+
 				if (!this.keepAlive) {
-					inputStream.close();
-					outputStream.close();
-					dataOutputStream.close();
 					socket.close();
 
 					if (verbose) {
@@ -163,9 +171,8 @@ public class TCPServer implements Runnable {
 					}
 				}
 
-				if (verbose) {
+				if (verbose)
 					System.out.println("socket closed? =" + socket.isClosed());
-				}
 
 			} catch (Exception e) {
 				System.err.println("Error closing stream : " + e.getMessage());
@@ -246,8 +253,8 @@ public class TCPServer implements Runnable {
 
 	private void methodGet(PrintWriter out, BufferedOutputStream dataOut, String fileRequested, String modifiedTime)
 			throws IOException, ParseException {
-		//index.html & index & / 
-		if (fileRequested.equals("/") || fileRequested.equals("index") )
+		// index.html & index & /
+		if (fileRequested.equals("/") || fileRequested.equals("index"))
 			fileRequested = DEFAULT_FILE;
 
 		File file = new File(WEB_ROOT, fileRequested);
@@ -256,8 +263,8 @@ public class TCPServer implements Runnable {
 			throw new FileNotFoundException("File doesn't exist!");
 
 		Date requestDate = null, fileDate = null;
-		
-		//If given a If-Modified-Since header date
+
+		// If given a If-Modified-Since header date
 		if (modifiedTime != null) {
 			SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
 
@@ -265,7 +272,7 @@ public class TCPServer implements Runnable {
 			fileDate = format.parse(format.format(file.lastModified()));
 		}
 
-		//If no If-Modified-Since was given or valid requestDate return 200
+		// If no If-Modified-Since was given or valid requestDate return 200
 		if (modifiedTime == null || requestDate.after(fileDate)) {
 			out.println("HTTP/1.1 200 OK");
 			out.println("Date: " + new Date());
@@ -285,7 +292,7 @@ public class TCPServer implements Runnable {
 				System.out.println("GET: File " + fileRequested + " returned");
 
 		} else {
-			//Else return 304
+			// Else return 304
 			out.println("HTTP/1.1 304 NOT MODIFIED");
 			out.println("Date: " + new Date());
 			out.println("Server: Java HTTP Server");
