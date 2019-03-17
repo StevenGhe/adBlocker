@@ -98,10 +98,6 @@ class TCPClient {
 		}
 	};
 	
-	
-
-	
-
 	public void run() throws Exception{
 
 		System.out.println("Client started on port: "  + PORT);
@@ -110,9 +106,7 @@ class TCPClient {
 		System.out.println("method " +this.HTTPMETHOD);
 		
 		PrintWriter writer = null;
-	
 
-		
 		try {
 			clientSocket = new Socket(this.HOSTNAME, this.PORT);
 			OutputStream out = clientSocket.getOutputStream();
@@ -120,43 +114,64 @@ class TCPClient {
 			requestWriter = new PrintWriter(out, true);
 			
 			response = clientSocket.getInputStream();
-			responseReader = new BufferedReader(new InputStreamReader(response));
+			InputStreamReader responseStream = new InputStreamReader(response);
+			responseReader = new BufferedReader(responseStream);
 			
 			requestWriter.println( HTTPMETHOD+" "+ URL.getPath() +" HTTP/1.1");
-			requestWriter.println("HOST:" + HOSTNAME);
+			System.out.println( HTTPMETHOD+" "+ URL.getPath() +" HTTP/1.1");
+			requestWriter.println("HOST: " + HOSTNAME);
+			System.out.println("Host: " + HOSTNAME);
 			requestWriter.println();
-//			requestWriter.flush();
+			requestWriter.flush();
 
 			
 			System.out.println("SERVER RESPONSE ---------------");
-
-			
+	
 			writer = new PrintWriter("html.tmp", "UTF-8");
 			
+			
+			
+			
 			String line;
+			// werkt op alles behalve localhost
+			while ((line = responseReader.readLine()) != null ) {
+				System.out.println(line);
+				writer.println(line);
+				
+			}
 			
-
-//			while ((line = responseReader.readLine()) != null ) {
-//				System.out.println(line);
-//				writer.println(line);
-//				
-//			}
 			
-			int charbyte;
-		    StringBuilder strbuilder = new StringBuilder();
+			// werkt niet op google.com
+//			int charbyte;
+//		    StringBuilder strbuilder = new StringBuilder();
+//
+//			    while ((charbyte = responseReader.read()) != 0){
+//			        strbuilder.append(Character.toChars(charbyte));
+//			    }
+//			    System.out.println(strbuilder.toString());
+			    
+			    
+			    
+			    
+			    
+			    
+			    
+			    
+			    
+			    
+			    
+			    
+			    
+			    
 
-			    while ((charbyte = responseReader.read()) != 0){
-			        strbuilder.append(Character.toChars(charbyte));
-			    }
-			    System.out.println(strbuilder.toString());
+//				DataInputStream responseInputStream = new DataInputStream(response);
+//				while ((charbyte = responseInputStream.read()) != -1){
+//		            strbuilder.append(Character.toChars(charbyte));
+//		        }
+//		        responseInputStream.close();
+//
+//			    System.out.println(strbuilder.toString());
 
-		
-			
-		
-
-		
-
-		
 		System.out.println("test");
 		
 		parseHtml();
