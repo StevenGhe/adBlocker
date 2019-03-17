@@ -224,8 +224,8 @@ public class TCPServer implements Runnable {
 			FileWriter fileWriter = new FileWriter(file, true);
 
 			char[] buffer = new char[contentLength];
-			int rsz = inputStream.read(buffer, 0, contentLength);
-			if (rsz == contentLength) {
+			int amountRead = inputStream.read(buffer, 0, contentLength);
+			if (amountRead == contentLength) {
 				fileWriter.write(buffer);
 				fileWriter.write("\n");
 			}

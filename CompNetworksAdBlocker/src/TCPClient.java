@@ -181,6 +181,8 @@ class TCPClient {
 					}
 					System.out.println("chunk read@@@@@@@@@@@@@@@@@@@\n");
 				} while (chunkLength > 0);
+				
+				fileWriter.flush();
 				fileWriter.close();
 			}
 
@@ -190,7 +192,10 @@ class TCPClient {
 				int amountRead = responseReader.read(buffer, 0, contentlength);
 				if (amountRead == contentlength) {
 					fileWriter.write(buffer);
+					fileWriter.write("\n");
 				}
+				fileWriter.flush();
+				fileWriter.close();
 			}
 
 			parseHtml();
