@@ -99,7 +99,7 @@ public class TCPServer implements Runnable {
 				if (s.contains(hostString))
 					host = s.substring(hostString.length());
 
-				if (s.contains(contentLenghtString))
+				if (s.contains(contentLenghtString))   
 					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
 
 				if (s.contains(connectionString))
