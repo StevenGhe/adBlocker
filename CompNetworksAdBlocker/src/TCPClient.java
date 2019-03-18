@@ -10,10 +10,10 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 
-//import org.jsoup.Jsoup;
-//import org.jsoup.nodes.Document;
-//import org.jsoup.nodes.Element;
-//import org.jsoup.select.Elements;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 class TCPClient {
 	private String httpMethod = null;
@@ -82,6 +82,7 @@ class TCPClient {
 			default:
 				System.out.println("HTTP Method not implemented");
 				break;
+
 			}
 
 			responseReader.close();
@@ -279,7 +280,7 @@ class TCPClient {
 			this.URL = new URL(myUrl);
 
 		} catch (Exception e) {
-			throw new Exception("help");
+			e.getStackTrace();
 		}
 
 		this.hostName = URL.getHost();
@@ -300,21 +301,60 @@ class TCPClient {
 				URL url = new URL(obj);
 
 				System.out.println(url);
+					
 
-				System.out.println(httpMethod + " " + obj + " HTTP/1.1");
-				outputStream.println(httpMethod + " " + obj + " HTTP/1.1");
-				outputStream.println("HOST:" + hostName);
-				outputStream.println();
-
-				System.out.println("SERVER RESPONSE ---DOWNLOADING-IMAGES---");
-				String line;
-				OutputStream dos;
+//				requestWriter.println(HTTPMETHOD + " " + obj + " HTTP/1.1");
+//				requestWriter.println("HOST:" + HOSTNAME);
+//				requestWriter.println();
+				
+				
 				String[] parts = obj.toString().split("/");
 				String fileName = parts[parts.length - 1];
-				dos = new FileOutputStream(fileName);
+				DataInputStream in = new DataInputStream(clientSocket.getInputStream());
+			    DataOutputStream bw = new DataOutputStream(new DataOutputStream(clientSocket.getOutputStream()));
+			    System.out.println("xx");
+			    bw.writeBytes("GET /solar.jpg HTTP/1.1\r\n");
+			    System.out.println("xx");
+			    bw.writeBytes("Host: localhost\r\n\r\n");
+			    bw.flush();
+			    
+			    
+//			    bw.writeBytes("GET /"+fileName+" HTTP/1.1\n");
+//			    bw.writeBytes("Host: "+HOSTNAME+"\n\n");
+			    System.out.println("xx");
+				OutputStream dos = new FileOutputStream("testtttt.jpg");
 				int count;
 				byte[] buffer = new byte[2048];
-//				while ((count = responseReader.read(buffer)) != -1) {
+				boolean eohFound = false;
+				System.out.println("xx");
+				while ((count = in.read(buffer)) != -1)
+				{
+				    if(!eohFound){
+				        String string = new String(buffer, 0, count);
+				        int indexOfEOH = string.indexOf("\r\n\r\n");
+				        if(indexOfEOH != -1) {
+				            count = count-indexOfEOH-4;
+				            buffer = string.substring(indexOfEOH+4).getBytes();
+				            eohFound = true;
+				        } else {
+				            count = 0;
+				        }
+				    }
+				  dos.write(buffer, 0, count);
+				  dos.flush();
+				}
+				in.close();
+				dos.close();
+//
+//				System.out.println("SERVER RESPONSE ---DOWNLOADING-IMAGES---");
+//				String line;
+//				OutputStream dos;
+//				String[] parts = obj.toString().split("/");
+//				String fileName = parts[parts.length - 1];
+//				dos = new FileOutputStream(fileName);
+//				int count;
+//				byte[] buffer = new byte[2048];
+//				while ((count = response.read(buffer)) != -1) {
 //					dos.write(buffer, 0, count);
 //					dos.flush();
 //				}
@@ -334,23 +374,26 @@ class TCPClient {
 
 	public void parseHtml() throws IOException {
 		objectToDownload = new ArrayList<>();
-		File input = new File("html.tmp");
+		File input = new File("clientFiles/html.tmp");
+
 		String changedHostname = URL.toString();
 		if (URL.toString().contains("http://localhost/")) {
 			changedHostname = "http://localhost:" + this.port;
 
 		}
-//		Document doc = Jsoup.parse(input, "UTF-8", changedHostname);
-//		Elements img = doc.getElementsByTag("img");
-//		for (Element el : img) {
-//			String src = el.absUrl("src");
-////			System.out.println("Image Found!");
-////			System.out.println("src attribute is : "+src);
-//
-////			System.out.println(src.getClass());
-//			objectTodDownload.add(src.toString());
 
-//		}
+		Document doc = Jsoup.parse(input, "UTF-8", changedHostname);
+		Elements img = doc.getElementsByTag("img");
+		
+		for (Element el : img) {
+			String src = el.absUrl("src");
+//			System.out.println("Image Found!");
+//			System.out.println("src attribute is : "+src);
+
+//			System.out.println(src.getClass());
+			objectTodDownload.add(src.toString());
+
+		}
 
 	}
 }
