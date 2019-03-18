@@ -1,14 +1,19 @@
-import java.awt.Image;
-import java.awt.image.RenderedImage;
-import java.io.*;
-import java.net.*;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.net.Socket;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-
-import javax.imageio.ImageIO;
-import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -23,7 +28,7 @@ class TCPClient {
 	private URL URL = null;
 	private int port = 80;
 
-	private List<String> objectToDownload = null;
+	private List<String> objectToDownload = new ArrayList<String>();;
 
 	private Socket clientSocket;
 
@@ -131,7 +136,7 @@ class TCPClient {
 		String transferEncoding = "Transfer-Encoding: ";
 		boolean chunkSet = false;
 		int contentLength = -1;
-		char[] buffer;
+		char[] buffer = null;
 
 		// Read header data
 		while ((line = responseReader.readLine()) != null && line.length() > 0) {
@@ -184,53 +189,45 @@ class TCPClient {
 		}
 
 		else {
-            // Non chunked GET response
-            buffer = new char[contentLength];
-            int amountRead = responseReader.read(buffer, 0, contentLength);
-            if (amountRead == contentLength) {
-                String bufferString = new String(buffer);
+			// Non chunked GET response
+			buffer = new char[contentLength];
+			int amountRead = responseReader.read(buffer, 0, contentLength);
+			if (amountRead == contentLength) {
+				String bufferString = new String(buffer);
 
-            if(bufferString.contains("ad")) {
-                    buffer = removeAds(bufferString);
-                }
-                System.out.println("GET RESULT = " + String.valueOf(buffer));
+				if (bufferString.contains("ad")) {
+					buffer = removeAds(bufferString);
+				}
+				System.out.println("GET RESULT = " + String.valueOf(buffer));
 
-
-                fileWriter.write(buffer);
+				fileWriter.write(buffer);
 //                System.err.println(buffer);
-                fileWriter.write("\n");
-            }
-            fileWriter.flush();
-            fileWriter.close();
-        }
+				fileWriter.write("\n");
+			}
+			fileWriter.flush();
+			fileWriter.close();
+		}
+		
+		parseHtml(buffer);
 	}
-	
+
 	private char[] removeAds(String buffer) {
+		String oldBuffer = buffer;
+		Document doc = Jsoup.parse(buffer);
 
-        String oldBuffer = buffer;
-        Document doc = Jsoup.parse(buffer);
+		Elements img = doc.getElementsByTag("img");
 
-        Elements img = doc.getElementsByTag("img");
+		for (Element el : img) {
 
+			String htmlLine = el.toString();
 
-        for (Element el : img) {
-            System.out.println(el);
-
-
-            String htmlLine = el.toString();
-
-            int height = 0;
-            int width = 0;
-            if(htmlLine.contains("ad")) {
-                System.err.println("yesss finally");
-                height = Integer.parseInt(el.attr("height"));
-                width = Integer.parseInt(el.attr("width"));
-                String replacementString = "<div class="adReplacementDiv" style="width:"+width+"px; height:"+height+"px;"></div>";
-                oldBuffer = oldBuffer.replace(htmlLine, replacementString);
-            }
-        }
-        return oldBuffer.toCharArray();
-    }
+			if (htmlLine.contains("ad")) {
+				String replacementString = "<div class=adReplacementDiv></div>\";";
+				oldBuffer = oldBuffer.replace(htmlLine, replacementString);
+			}
+		}
+		return oldBuffer.toCharArray();
+	}
 
 	private void firePostRequest(String path) throws IOException {
 		// Specify contentlength
@@ -332,17 +329,26 @@ class TCPClient {
 		}
 	}
 
-	public void download() {
+
+	public void parseHtml(char[] buffer) throws IOException {
+		Document doc = Jsoup.parse(String.valueOf(buffer), "UTF-8");
+		Elements img = doc.getElementsByTag("img");
+
+		for (Element el : img) {
+			objectToDownload.add(el.attr("src"));
+		}
+		downloadImages();
+	}
+	
+
+	public void downloadImages() {
 		System.out.println("\n\n\n DOWNLOADING IMAGES -----------");
 		try {
-			//For each image that needs to be downloaded
-			for (String imgFile : objectToDownload) {
-				
-				//Setup new connection with readers
-				clientSocket = new Socket(this.hostName, this.port);
+			// For each image that needs to be downloaded
+			for (String fileName : objectToDownload) {
 
-				String[] parts = imgFile.toString().split("/");
-				String fileName = parts[parts.length - 1];
+				// Setup new connection with readers
+				clientSocket = new Socket(this.hostName, this.port);
 
 				DataOutputStream imageOutputStream = new DataOutputStream(clientSocket.getOutputStream());
 				dataResponseReader = new DataInputStream(clientSocket.getInputStream());
@@ -366,7 +372,7 @@ class TCPClient {
 
 				System.out.println("Response image Content-Lenght " + contentLength + "\n");
 
-				//Binairy output stream to file
+				// Binairy output stream to file
 				OutputStream dos = new FileOutputStream("clientImg/" + fileName);
 
 				byte[] buffer = new byte[contentLength];
@@ -382,29 +388,4 @@ class TCPClient {
 			e.printStackTrace();
 		}
 	};
-
-	public void parseHtml() throws IOException {
-		objectToDownload = new ArrayList<>();
-		File input = new File("clientFiles/html.tmp");
-
-		String changedHostname = URL.toString();
-		if (URL.toString().contains("http://localhost/")) {
-			changedHostname = "http://localhost:" + this.port;
-
-		}
-
-		Document doc = Jsoup.parse(input, "UTF-8", changedHostname);
-		Elements img = doc.getElementsByTag("img");
-
-		for (Element el : img) {
-			String src = el.absUrl("src");
-//			System.out.println("Image Found!");
-//			System.out.println("src attribute is : "+src);
-
-//			System.out.println(src.getClass());
-			objectToDownload.add(src.toString());
-
-		}
-
-	}
 }
