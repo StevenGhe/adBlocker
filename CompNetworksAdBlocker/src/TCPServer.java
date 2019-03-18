@@ -17,7 +17,7 @@ import java.util.Date;
 import java.util.Locale;
 
 public class TCPServer implements Runnable {
-	static final int PORT = 8081;
+	static final int PORT = 80;
 	private static int connectCounter = 0;
 	private Socket socket;
 
@@ -84,7 +84,9 @@ public class TCPServer implements Runnable {
 			fileRequested = parsedFirstLine[1].toLowerCase();
 			httpVersion = parsedFirstLine[2].toUpperCase();
 
-			this.keepAlive &= httpVersion.contentEquals("HTTP/1.1");
+			this.keepAlive &= httpVersion.equals("HTTP/1.1");
+			if (verbose && !this.keepAlive)
+				System.out.println("Http version is not 1.1, closing after request");
 
 			String s = null, host = null, modifiedTime = null;
 			int contentLength = 0;
@@ -99,7 +101,7 @@ public class TCPServer implements Runnable {
 				if (s.contains(hostString))
 					host = s.substring(hostString.length());
 
-				if (s.contains(contentLenghtString))   
+				if (s.contains(contentLenghtString))
 					contentLength = Integer.parseInt(s.substring(contentLenghtString.length()));
 
 				if (s.contains(connectionString))
@@ -158,11 +160,10 @@ public class TCPServer implements Runnable {
 			}
 		} finally {
 			try {
-				inputStream.close();
-				outputStream.close();
-				dataOutputStream.close();
-
 				if (!this.keepAlive) {
+					inputStream.close();
+					outputStream.close();
+					dataOutputStream.close();
 					socket.close();
 
 					if (verbose) {

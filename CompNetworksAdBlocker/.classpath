@@ -4,6 +4,7 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="webContent"/>
 	<classpathentry kind="src" path="clientFiles"/>
-	<classpathentry kind="lib" path="/home/laurens/Downloads/jsoup-1.11.3.jar"/>
+	<classpathentry kind="src" path="clientImg"/>
+	<classpathentry kind="lib" path="C:/Users/Steven/Dropbox/Jar files/jsoup-1.11.3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

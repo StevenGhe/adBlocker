@@ -29,6 +29,7 @@ class TCPClient {
 
 	private PrintWriter outputStream;
 	private BufferedReader responseReader;
+	private DataInputStream dataResponseReader;
 	private BufferedOutputStream dataOutputStream;
 
 	private String newFileContent = null;
@@ -53,8 +54,10 @@ class TCPClient {
 
 		try {
 			clientSocket = new Socket(this.hostName, this.port);
+			clientSocket.setKeepAlive(true);
 
 			responseReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+			dataResponseReader = new DataInputStream(clientSocket.getInputStream());
 
 			outputStream = new PrintWriter(clientSocket.getOutputStream(), true);
 			dataOutputStream = new BufferedOutputStream(clientSocket.getOutputStream());
@@ -85,12 +88,8 @@ class TCPClient {
 
 			}
 
-			responseReader.close();
-			outputStream.close();
-			dataOutputStream.close();
-
-			clientSocket.close();
-			System.out.println("Client closed!");
+//			clientSocket.close();
+//			System.out.println("Client closed!");
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -217,7 +216,7 @@ class TCPClient {
 			int amountRead = responseReader.read(buffer, 0, contentLength);
 
 			if (amountRead == contentLength) {
-				System.out.println("GET RESULT = " + String.valueOf(buffer));
+//				System.out.println("GET RESULT = " + String.valueOf(buffer));
 				fileWriter.write(buffer);
 				fileWriter.write("\n");
 			}
@@ -292,84 +291,45 @@ class TCPClient {
 		}
 	}
 
-	public void download() throws Exception {
-
-		Image image = null;
-
+	public void download() {
+		System.out.println("\n\n\n DOWNLOADING IMAGES -----------");
 		try {
-			for (String obj : objectToDownload) {
-				URL url = new URL(obj);
+			for (String imgFile : objectToDownload) {
+				clientSocket = new Socket(this.hostName, this.port);
 
-				System.out.println(url);
-					
-
-//				requestWriter.println(HTTPMETHOD + " " + obj + " HTTP/1.1");
-//				requestWriter.println("HOST:" + HOSTNAME);
-//				requestWriter.println();
-				
-				
-				String[] parts = obj.toString().split("/");
+				String[] parts = imgFile.toString().split("/");
 				String fileName = parts[parts.length - 1];
-				DataInputStream in = new DataInputStream(clientSocket.getInputStream());
-			    DataOutputStream bw = new DataOutputStream(new DataOutputStream(clientSocket.getOutputStream()));
-			    
-			    
-			    System.out.println("xx");
-			    
-			    String cmd =  "GET /solar.jpg HTTP/1.1\r\n";
-			    bw.write(cmd.getBytes());
-			    System.out.println("xx");
-			    cmd = "Host: localhost:8081\r\n\r\n";
-			    bw.writeBytes(cmd);
-			    bw.flush();
-			    
-			    
-//			    bw.writeBytes("GET /"+fileName+" HTTP/1.1\n");
-//			    bw.writeBytes("Host: "+HOSTNAME+"\n\n");
-			    System.out.println("xx");
-				OutputStream dos = new FileOutputStream("testtttt.jpg");
-				int count;
-				byte[] buffer = new byte[2048];
-				boolean eohFound = false;
-				System.out.println("xx");
-				while ((count = in.read(buffer)) != -1)
-				{
-				    if(!eohFound){
-				        String string = new String(buffer, 0, count);
-				        int indexOfEOH = string.indexOf("\r\n\r\n");
-				        if(indexOfEOH != -1) {
-				            count = count-indexOfEOH-4;
-				            buffer = string.substring(indexOfEOH+4).getBytes();
-				            eohFound = true;
-				        } else {
-				            count = 0;
-				        }
-				    }
-				  dos.write(buffer, 0, count);
-				  dos.flush();
-				}
-				in.close();
-				dos.close();
-//
-//				System.out.println("SERVER RESPONSE ---DOWNLOADING-IMAGES---");
-//				String line;
-//				OutputStream dos;
-//				String[] parts = obj.toString().split("/");
-//				String fileName = parts[parts.length - 1];
-//				dos = new FileOutputStream(fileName);
-//				int count;
-//				byte[] buffer = new byte[2048];
-//				while ((count = response.read(buffer)) != -1) {
-//					dos.write(buffer, 0, count);
-//					dos.flush();
-//				}
-//				dos.close();
 
-//			    
-//			    File outputfile = new File(fileName);
-//
-//
-//			    ImageIO.write((RenderedImage)  image, "jpg", outputfile);
+				DataOutputStream imageOutputStream = new DataOutputStream(clientSocket.getOutputStream());
+				dataResponseReader = new DataInputStream(clientSocket.getInputStream());
+				responseReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+
+				System.out.println("GET /" + fileName + " HTTP/1.1");
+				imageOutputStream.writeBytes("GET " + fileName + " HTTP/1.1\r\n");
+				imageOutputStream.writeBytes("Host: " + hostName + "\r\n\r\n");
+				imageOutputStream.flush();
+
+				String line;
+				String contentLenghtString = "Content-Length: ";
+				int contentLength = -1;
+
+				// Get content length from header
+				System.out.println(responseReader.readLine());
+				while ((line = responseReader.readLine()) != null && line.length() > 0) {
+					if (line.contains(contentLenghtString))
+						contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
+				}
+
+				System.out.println("Response image Content-Lenght " + contentLength + "\n");
+
+				OutputStream dos = new FileOutputStream("clientImg/" + fileName);
+
+				byte[] buffer = new byte[contentLength];
+				dataResponseReader.read(buffer, 0, contentLength);
+
+				dos.write(buffer);
+				dos.flush();
+				dos.close();
 			}
 			System.out.println("Images successfully stored locally.");
 		} catch (IOException e) {
@@ -390,7 +350,7 @@ class TCPClient {
 
 		Document doc = Jsoup.parse(input, "UTF-8", changedHostname);
 		Elements img = doc.getElementsByTag("img");
-		
+
 		for (Element el : img) {
 			String src = el.absUrl("src");
 //			System.out.println("Image Found!");
