@@ -38,6 +38,10 @@ class TCPClient {
 
 		String path = URL.getPath();
 
+		if (path == "")
+			path = "/";
+
+		// If post or put, ask input before sending request
 		if (httpMethod.equals("POST") || httpMethod.equals("PUT")) {
 			BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 
@@ -54,16 +58,12 @@ class TCPClient {
 
 		try {
 			clientSocket = new Socket(this.hostName, this.port);
-			clientSocket.setKeepAlive(true);
 
 			responseReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 			dataResponseReader = new DataInputStream(clientSocket.getInputStream());
 
 			outputStream = new PrintWriter(clientSocket.getOutputStream(), true);
 			dataOutputStream = new BufferedOutputStream(clientSocket.getOutputStream());
-
-			if (path == "")
-				path = "/";
 
 			switch (httpMethod) {
 			case "HEAD":
@@ -88,12 +88,19 @@ class TCPClient {
 
 			}
 
-//			clientSocket.close();
-//			System.out.println("Client closed!");
+			clientSocket.close();
+			System.out.println("Client closed!");
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void fireHeadRequest(String path) {
+		outputStream.println("HEAD " + path + " HTTP/1.1");
+		outputStream.println("Host: " + hostName);
+		outputStream.println();
+		outputStream.flush();
 	}
 
 	private void readHeadRequest() throws IOException {
@@ -101,7 +108,7 @@ class TCPClient {
 
 		String line;
 
-		// Read header data
+		// Print header data
 		System.out.println(responseReader.readLine());
 		while ((line = responseReader.readLine()) != null && line.length() > 0) {
 			System.out.println("HTTP HEAD " + line);
@@ -109,49 +116,11 @@ class TCPClient {
 
 	}
 
-	private void readPutRequest() throws NumberFormatException, IOException {
-		System.out.println("\n SERVER PUT RESPONSE ---------------");
-
-		String line;
-		String contentLenghtString = "Content-Length: ";
-		int contentLength = -1;
-
-		// Read header data
-		System.out.println(responseReader.readLine());
-		while ((line = responseReader.readLine()) != null && line.length() > 0) {
-			if (line.contains(contentLenghtString))
-				contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
-		}
-
-		// Non chunked PUT response
-		char[] buffer = new char[contentLength];
-		int amountRead = responseReader.read(buffer, 0, contentLength);
-		if (amountRead == contentLength) {
-			System.out.println("PUT RESPONSE BODY = \n" + String.valueOf(buffer));
-		}
-
-	}
-
-	private void readPostResponse() throws NumberFormatException, IOException {
-		System.out.println("\nSERVER POST RESPONSE ---------------");
-
-		String line;
-		String contentLenghtString = "Content-Length: ";
-		int contentLength = -1;
-
-		// Read header data
-		System.out.println(responseReader.readLine());
-		while ((line = responseReader.readLine()) != null && line.length() > 0) {
-			if (line.contains(contentLenghtString))
-				contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
-		}
-
-		// Non chunked POST response
-		char[] buffer = new char[contentLength];
-		int amountRead = responseReader.read(buffer, 0, contentLength);
-		if (amountRead == contentLength) {
-			System.out.println("POST RESPONSE BODY = \n" + String.valueOf(buffer));
-		}
+	private void fireGetRequest(String path) {
+		outputStream.println("GET " + path + " HTTP/1.1");
+		outputStream.println("Host: " + hostName);
+		outputStream.println();
+		outputStream.flush();
 	}
 
 	private void readGetResponse() throws Exception {
@@ -173,18 +142,22 @@ class TCPClient {
 				chunkSet = line.substring(transferEncoding.length()).equals("chunked");
 		}
 
-		File file = new File(new File("clientFiles/"), "html.tmp");
+		// Create file to store data
+		File file = new File("clientFiles/tmp.html");
 		file.createNewFile();
 
+		// If existed: clean file
 		FileWriter fileWriter = new FileWriter(file);
 		fileWriter.write("");
 		fileWriter.close();
 		fileWriter = new FileWriter(file, true);
 
+		// If Transfer encoding was set && it was set to chunked
 		if (chunkSet) {
 			int chunkLengthDec = 0;
 
 			do {
+				// Read first hex line (=chunk size)
 				chunkLengthDec = Integer.parseInt(responseReader.readLine(), 16);
 
 				if (chunkLengthDec > 0) {
@@ -216,7 +189,7 @@ class TCPClient {
 			int amountRead = responseReader.read(buffer, 0, contentLength);
 
 			if (amountRead == contentLength) {
-//				System.out.println("GET RESULT = " + String.valueOf(buffer));
+				System.out.println("GET RESULT = " + String.valueOf(buffer));
 				fileWriter.write(buffer);
 				fileWriter.write("\n");
 			}
@@ -229,40 +202,78 @@ class TCPClient {
 
 	}
 
-	private void firePutRequest(String path) throws IOException {
-		outputStream.println("PUT " + path + " HTTP/1.1");
-		outputStream.println("Host: " + hostName);
-		outputStream.println("Content-Length: " + newFileContent.length());
-		outputStream.println();
-		outputStream.flush();
-
-		dataOutputStream.write(newFileContent.getBytes(Charset.forName("UTF-8")), 0, newFileContent.length());
-		dataOutputStream.flush();
-	}
-
 	private void firePostRequest(String path) throws IOException {
+		// Specify contentlength
 		outputStream.println("POST " + path + " HTTP/1.1");
 		outputStream.println("Host: " + hostName);
 		outputStream.println("Content-Length: " + newFileContent.length());
 		outputStream.println();
 		outputStream.flush();
 
+		// use data output stream to stream bytes instead of strings
 		dataOutputStream.write(newFileContent.getBytes(Charset.forName("UTF-8")), 0, newFileContent.length());
 		dataOutputStream.flush();
 	}
 
-	private void fireGetRequest(String path) {
-		outputStream.println("GET " + path + " HTTP/1.1");
-		outputStream.println("Host: " + hostName);
-		outputStream.println();
-		outputStream.flush();
+	private void readPostResponse() throws NumberFormatException, IOException {
+		System.out.println("\nSERVER POST RESPONSE ---------------");
+
+		String line;
+		String contentLenghtString = "Content-Length: ";
+		int contentLength = -1;
+
+		// Read header data
+		System.out.println(responseReader.readLine());
+		while ((line = responseReader.readLine()) != null && line.length() > 0) {
+			if (line.contains(contentLenghtString))
+				contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
+		}
+
+		// Non chunked POST response
+		char[] buffer = new char[contentLength];
+		int amountRead = responseReader.read(buffer, 0, contentLength);
+
+		if (amountRead == contentLength) {
+			// Post body is data of the edited file
+			System.out.println("POST RESPONSE BODY = \n" + String.valueOf(buffer));
+		}
 	}
 
-	private void fireHeadRequest(String path) {
-		outputStream.println("HEAD " + path + " HTTP/1.1");
+	private void firePutRequest(String path) throws IOException {
+		// Specify contentlength
+		outputStream.println("PUT " + path + " HTTP/1.1");
 		outputStream.println("Host: " + hostName);
+		outputStream.println("Content-Length: " + newFileContent.length());
 		outputStream.println();
 		outputStream.flush();
+
+		// use data output stream to stream bytes instead of strings
+		dataOutputStream.write(newFileContent.getBytes(Charset.forName("UTF-8")), 0, newFileContent.length());
+		dataOutputStream.flush();
+	}
+
+	private void readPutRequest() throws NumberFormatException, IOException {
+		System.out.println("\n SERVER PUT RESPONSE ---------------");
+
+		String line;
+		String contentLenghtString = "Content-Length: ";
+		int contentLength = -1;
+
+		// Read header data
+		System.out.println(responseReader.readLine());
+		while ((line = responseReader.readLine()) != null && line.length() > 0) {
+			if (line.contains(contentLenghtString))
+				contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
+		}
+
+		// Non chunked PUT response
+		char[] buffer = new char[contentLength];
+		int amountRead = responseReader.read(buffer, 0, contentLength);
+		if (amountRead == contentLength) {
+			// Put body is data of the edited file
+			System.out.println("PUT RESPONSE BODY = \n" + String.valueOf(buffer));
+		}
+
 	}
 
 	public void parseParam(String[] args) throws Exception {
@@ -294,7 +305,10 @@ class TCPClient {
 	public void download() {
 		System.out.println("\n\n\n DOWNLOADING IMAGES -----------");
 		try {
+			//For each image that needs to be downloaded
 			for (String imgFile : objectToDownload) {
+				
+				//Setup new connection with readers
 				clientSocket = new Socket(this.hostName, this.port);
 
 				String[] parts = imgFile.toString().split("/");
@@ -322,6 +336,7 @@ class TCPClient {
 
 				System.out.println("Response image Content-Lenght " + contentLength + "\n");
 
+				//Binairy output stream to file
 				OutputStream dos = new FileOutputStream("clientImg/" + fileName);
 
 				byte[] buffer = new byte[contentLength];
