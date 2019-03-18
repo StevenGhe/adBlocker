@@ -2,6 +2,7 @@ import java.awt.Image;
 import java.awt.image.RenderedImage;
 import java.io.*;
 import java.net.*;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -15,126 +16,77 @@ import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 //import org.jsoup.select.Elements;
 
 class TCPClient {
-	private String HTTPMETHOD = null;
-	private URL URL = null;
-	private int PORT = 80;
+	private String httpMethod = null;
 	private String restARGS = null;
-	private String HOSTNAME;
-	private List<String> httpMethods = Arrays.asList("GET", "HEAD", "POST", "PUT");
-	private List<String> objectTodDownload;
+	private String hostName;
+
+	private URL URL = null;
+	private int port = 80;
+
+	private List<String> objectToDownload;
+
 	private Socket clientSocket;
-	private PrintWriter requestWriter;
+
+	private PrintWriter outputStream;
 	private BufferedReader responseReader;
-	private InputStream response;
+	private BufferedOutputStream dataOutputStream;
+
+	private String newFileContent = null;
 
 	public void run() throws Exception {
 
-		System.out.println("Client started on port: " + PORT);
-		System.out.println("---------------------------------");
-		System.out.println("host " + this.HOSTNAME);
-		System.out.println("method " + this.HTTPMETHOD);
+		String path = URL.getPath();
 
-		PrintWriter writer = null;
+		if (httpMethod.equals("POST") || httpMethod.equals("PUT")) {
+			BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+
+			System.out.println("\n\n File name on server: ");
+			path += br.readLine();
+
+			System.out.println("\n\n File content: ");
+			newFileContent = br.readLine();
+		}
+
+		System.out.println("Client started on port: " + port);
+		System.out.println("Client request host " + this.hostName);
+		System.out.println("Client request method " + this.httpMethod);
 
 		try {
-			clientSocket = new Socket(this.HOSTNAME, this.PORT);
-			OutputStream out = clientSocket.getOutputStream();
+			clientSocket = new Socket(this.hostName, this.port);
 
-			requestWriter = new PrintWriter(out, true);
+			responseReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 
-			response = clientSocket.getInputStream();
-			InputStreamReader responseStream = new InputStreamReader(response);
-			responseReader = new BufferedReader(responseStream);
-			String path = URL.getPath();
-			
-			if (path == "") 
+			outputStream = new PrintWriter(clientSocket.getOutputStream(), true);
+			dataOutputStream = new BufferedOutputStream(clientSocket.getOutputStream());
+
+			if (path == "")
 				path = "/";
-			
-			requestWriter.println(HTTPMETHOD + " " + path + " HTTP/1.1");
-			requestWriter.println("Host: " + HOSTNAME);
-			requestWriter.println();
-			requestWriter.flush();
 
-			System.out.println("SERVER RESPONSE ---------------");
-
-
-			String line;
-			String contentLenghtString = "Content-Length: ";
-			String transferEncoding = "Transfer-Encoding: ";
-			boolean chunkSet = false;
-			int contentLength = -1;
-
-			//Read header data
-			while ((line = responseReader.readLine()) != null && line.length() > 0) {
-				if (line.contains(contentLenghtString))
-					contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
-				
-				if (line.contains(transferEncoding))
-					chunkSet = line.substring(transferEncoding.length()).equals("chunked");
+			switch (httpMethod) {
+			case "HEAD":
+				fireHeadRequest(path);
+				readHeadRequest();
+				break;
+			case "GET":
+				fireGetRequest(path);
+				readGetResponse();
+				break;
+			case "POST":
+				firePostRequest(path);
+				readPostResponse();
+				break;
+			case "PUT":
+				firePutRequest(path);
+				readPutRequest();
+				break;
+			default:
+				System.out.println("HTTP Method not implemented");
+				break;
 			}
 
-			File file = new File(new File("clientFiles/"), "html.tmp");
-			file.createNewFile();
-
-			FileWriter fileWriter = new FileWriter(file);
-			fileWriter.write("");
-			fileWriter.close();
-			fileWriter = new FileWriter(file, true);
-
-			char[] buffer;
-
-			if (chunkSet) {
-				int chunkLength = 0;
-
-				do {
-					chunkLength = Integer.parseInt(responseReader.readLine(), 16);
-
-					if (chunkLength > 0) {
-						System.out.println("ChunksizeInDec= " + chunkLength);
-
-						buffer = new char[chunkLength];
-						int offset = 0;
-
-						while (offset < chunkLength) {
-							System.out.println("BYTESREAD: " + offset);
-							int amountRead = responseReader.read(buffer, offset, chunkLength - offset);
-
-							if (amountRead < 0)
-								break;
-
-							System.err.println("AmtRead= " + amountRead);
-
-							fileWriter.write(buffer);
-							System.out.println("GET CHUNKRESULT = " + String.valueOf(buffer));
-
-							offset += amountRead;
-						}
-						responseReader.read();
-						responseReader.read();
-					}
-					System.out.println("chunk read@@@@@@@@@@@@@@@@@@@\n");
-				} while (chunkLength > 0);
-
-				fileWriter.flush();
-				fileWriter.close();
-			}
-
-			else {
-				System.out.println(contentLength);
-				buffer = new char[contentLength];
-
-				int amountRead = responseReader.read(buffer, 0, contentLength);
-				if (amountRead == contentLength) {
-					System.out.println("GET RESULT = " + String.valueOf(buffer));
-					fileWriter.write(buffer);
-					fileWriter.write("\n");
-				}
-				fileWriter.flush();
-				fileWriter.close();
-			}
-
-			parseHtml();
-			download();
+			responseReader.close();
+			outputStream.close();
+			dataOutputStream.close();
 
 			clientSocket.close();
 			System.out.println("Client closed!");
@@ -143,11 +95,180 @@ class TCPClient {
 			e.printStackTrace();
 		}
 	}
-	
+
+	private void readHeadRequest() throws IOException {
+		System.out.println("\n SERVER HEAD RESPONSE ---------------");
+
+		String line;
+
+		// Read header data
+		System.out.println(responseReader.readLine());
+		while ((line = responseReader.readLine()) != null && line.length() > 0) {
+			System.out.println("HTTP HEAD " + line);
+		}
+
+	}
+
+	private void readPutRequest() throws NumberFormatException, IOException {
+		System.out.println("\n SERVER PUT RESPONSE ---------------");
+
+		String line;
+		String contentLenghtString = "Content-Length: ";
+		int contentLength = -1;
+
+		// Read header data
+		System.out.println(responseReader.readLine());
+		while ((line = responseReader.readLine()) != null && line.length() > 0) {
+			if (line.contains(contentLenghtString))
+				contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
+		}
+
+		// Non chunked PUT response
+		char[] buffer = new char[contentLength];
+		int amountRead = responseReader.read(buffer, 0, contentLength);
+		if (amountRead == contentLength) {
+			System.out.println("PUT RESPONSE BODY = \n" + String.valueOf(buffer));
+		}
+
+	}
+
+	private void readPostResponse() throws NumberFormatException, IOException {
+		System.out.println("\nSERVER POST RESPONSE ---------------");
+
+		String line;
+		String contentLenghtString = "Content-Length: ";
+		int contentLength = -1;
+
+		// Read header data
+		System.out.println(responseReader.readLine());
+		while ((line = responseReader.readLine()) != null && line.length() > 0) {
+			if (line.contains(contentLenghtString))
+				contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
+		}
+
+		// Non chunked POST response
+		char[] buffer = new char[contentLength];
+		int amountRead = responseReader.read(buffer, 0, contentLength);
+		if (amountRead == contentLength) {
+			System.out.println("POST RESPONSE BODY = \n" + String.valueOf(buffer));
+		}
+	}
+
+	private void readGetResponse() throws Exception {
+		System.out.println("\nSERVER GET RESPONSE ---------------");
+
+		String line;
+		String contentLenghtString = "Content-Length: ";
+		String transferEncoding = "Transfer-Encoding: ";
+		boolean chunkSet = false;
+		int contentLength = -1;
+		char[] buffer;
+
+		// Read header data
+		while ((line = responseReader.readLine()) != null && line.length() > 0) {
+			if (line.contains(contentLenghtString))
+				contentLength = Integer.parseInt(line.substring(contentLenghtString.length()));
+
+			if (line.contains(transferEncoding))
+				chunkSet = line.substring(transferEncoding.length()).equals("chunked");
+		}
+
+		File file = new File(new File("clientFiles/"), "html.tmp");
+		file.createNewFile();
+
+		FileWriter fileWriter = new FileWriter(file);
+		fileWriter.write("");
+		fileWriter.close();
+		fileWriter = new FileWriter(file, true);
+
+		if (chunkSet) {
+			int chunkLengthDec = 0;
+
+			do {
+				chunkLengthDec = Integer.parseInt(responseReader.readLine(), 16);
+
+				if (chunkLengthDec > 0) {
+					buffer = new char[chunkLengthDec];
+					int offset = 0;
+
+					while (offset < chunkLengthDec) {
+						int amountRead = responseReader.read(buffer, offset, chunkLengthDec - offset);
+
+						if (amountRead < 0)
+							break;
+
+						fileWriter.write(buffer);
+
+						offset += amountRead;
+					}
+					responseReader.read();
+					responseReader.read();
+				}
+			} while (chunkLengthDec > 0);
+
+			fileWriter.flush();
+			fileWriter.close();
+		}
+
+		else {
+			// Non chunked GET response
+			buffer = new char[contentLength];
+			int amountRead = responseReader.read(buffer, 0, contentLength);
+
+			if (amountRead == contentLength) {
+				System.out.println("GET RESULT = " + String.valueOf(buffer));
+				fileWriter.write(buffer);
+				fileWriter.write("\n");
+			}
+			fileWriter.flush();
+			fileWriter.close();
+		}
+
+		parseHtml();
+		download();
+
+	}
+
+	private void firePutRequest(String path) throws IOException {
+		outputStream.println("PUT " + path + " HTTP/1.1");
+		outputStream.println("Host: " + hostName);
+		outputStream.println("Content-Length: " + newFileContent.length());
+		outputStream.println();
+		outputStream.flush();
+
+		dataOutputStream.write(newFileContent.getBytes(Charset.forName("UTF-8")), 0, newFileContent.length());
+		dataOutputStream.flush();
+	}
+
+	private void firePostRequest(String path) throws IOException {
+		outputStream.println("POST " + path + " HTTP/1.1");
+		outputStream.println("Host: " + hostName);
+		outputStream.println("Content-Length: " + newFileContent.length());
+		outputStream.println();
+		outputStream.flush();
+
+		dataOutputStream.write(newFileContent.getBytes(Charset.forName("UTF-8")), 0, newFileContent.length());
+		dataOutputStream.flush();
+	}
+
+	private void fireGetRequest(String path) {
+		outputStream.println("GET " + path + " HTTP/1.1");
+		outputStream.println("Host: " + hostName);
+		outputStream.println();
+		outputStream.flush();
+	}
+
+	private void fireHeadRequest(String path) {
+		outputStream.println("HEAD " + path + " HTTP/1.1");
+		outputStream.println("Host: " + hostName);
+		outputStream.println();
+		outputStream.flush();
+	}
+
 	public void parseParam(String[] args) throws Exception {
 		if (args.length == 0)
 			System.out.println("There are no arguments passed.");
-		this.HTTPMETHOD = args[0];
+		this.httpMethod = args[0];
 		try {
 
 //			if(httpMethods.contains(HTTPMETHOD)) throw new IllegalArgumentException("method not supported");
@@ -161,8 +282,8 @@ class TCPClient {
 			throw new Exception("help");
 		}
 
-		this.HOSTNAME = URL.getHost();
-		this.PORT = Integer.parseInt(args[2]);
+		this.hostName = URL.getHost();
+		this.port = Integer.parseInt(args[2]);
 
 		for (int i = 3; i < args.length; i++) {
 			restARGS = args[i];
@@ -175,15 +296,15 @@ class TCPClient {
 		Image image = null;
 
 		try {
-			for (String obj : objectTodDownload) {
+			for (String obj : objectToDownload) {
 				URL url = new URL(obj);
 
 				System.out.println(url);
 
-				System.out.println(HTTPMETHOD + " " + obj + " HTTP/1.1");
-				requestWriter.println(HTTPMETHOD + " " + obj + " HTTP/1.1");
-				requestWriter.println("HOST:" + HOSTNAME);
-				requestWriter.println();
+				System.out.println(httpMethod + " " + obj + " HTTP/1.1");
+				outputStream.println(httpMethod + " " + obj + " HTTP/1.1");
+				outputStream.println("HOST:" + hostName);
+				outputStream.println();
 
 				System.out.println("SERVER RESPONSE ---DOWNLOADING-IMAGES---");
 				String line;
@@ -193,11 +314,11 @@ class TCPClient {
 				dos = new FileOutputStream(fileName);
 				int count;
 				byte[] buffer = new byte[2048];
-				while ((count = response.read(buffer)) != -1) {
-					dos.write(buffer, 0, count);
-					dos.flush();
-				}
-				dos.close();
+//				while ((count = responseReader.read(buffer)) != -1) {
+//					dos.write(buffer, 0, count);
+//					dos.flush();
+//				}
+//				dos.close();
 
 //			    
 //			    File outputfile = new File(fileName);
@@ -211,13 +332,12 @@ class TCPClient {
 		}
 	};
 
-
 	public void parseHtml() throws IOException {
-		objectTodDownload = new ArrayList<>();
+		objectToDownload = new ArrayList<>();
 		File input = new File("html.tmp");
 		String changedHostname = URL.toString();
 		if (URL.toString().contains("http://localhost/")) {
-			changedHostname = "http://localhost:" + this.PORT;
+			changedHostname = "http://localhost:" + this.port;
 
 		}
 //		Document doc = Jsoup.parse(input, "UTF-8", changedHostname);

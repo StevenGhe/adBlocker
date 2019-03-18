@@ -215,6 +215,7 @@ public class TCPServer implements Runnable {
 		if (file.createNewFile()) {
 			if (verbose)
 				System.out.println("File not yet found. Creating new file!");
+			file.delete();
 			this.methodPUT(inputStream, outputStream, dataOutputStream, fileRequested, contentLength);
 		} else {
 
@@ -246,7 +247,6 @@ public class TCPServer implements Runnable {
 
 			byte[] data = readFileData(file, newContentLength);
 			dataOutputStream.write(data, 0, newContentLength);
-			dataOutputStream.write(0);
 			dataOutputStream.flush();
 		}
 	}
@@ -345,8 +345,7 @@ public class TCPServer implements Runnable {
 			dataOut.flush();
 
 		} else {
-			// TODO: Do we need to return an error?
-			System.out.println("File already exists.");
+			badRequest(outputStream, dataOut);
 		}
 	}
 
