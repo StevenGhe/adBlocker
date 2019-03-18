@@ -184,23 +184,53 @@ class TCPClient {
 		}
 
 		else {
-			// Non chunked GET response
-			buffer = new char[contentLength];
-			int amountRead = responseReader.read(buffer, 0, contentLength);
+            // Non chunked GET response
+            buffer = new char[contentLength];
+            int amountRead = responseReader.read(buffer, 0, contentLength);
+            if (amountRead == contentLength) {
+                String bufferString = new String(buffer);
 
-			if (amountRead == contentLength) {
-				System.out.println("GET RESULT = " + String.valueOf(buffer));
-				fileWriter.write(buffer);
-				fileWriter.write("\n");
-			}
-			fileWriter.flush();
-			fileWriter.close();
-		}
+            if(bufferString.contains("ad")) {
+                    buffer = removeAds(bufferString);
+                }
+                System.out.println("GET RESULT = " + String.valueOf(buffer));
 
-		parseHtml();
-		download();
 
+                fileWriter.write(buffer);
+//                System.err.println(buffer);
+                fileWriter.write("\n");
+            }
+            fileWriter.flush();
+            fileWriter.close();
+        }
 	}
+	
+	private char[] removeAds(String buffer) {
+
+        String oldBuffer = buffer;
+        Document doc = Jsoup.parse(buffer);
+
+        Elements img = doc.getElementsByTag("img");
+
+
+        for (Element el : img) {
+            System.out.println(el);
+
+
+            String htmlLine = el.toString();
+
+            int height = 0;
+            int width = 0;
+            if(htmlLine.contains("ad")) {
+                System.err.println("yesss finally");
+                height = Integer.parseInt(el.attr("height"));
+                width = Integer.parseInt(el.attr("width"));
+                String replacementString = "<div class="adReplacementDiv" style="width:"+width+"px; height:"+height+"px;"></div>";
+                oldBuffer = oldBuffer.replace(htmlLine, replacementString);
+            }
+        }
+        return oldBuffer.toCharArray();
+    }
 
 	private void firePostRequest(String path) throws IOException {
 		// Specify contentlength
