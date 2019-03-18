@@ -23,7 +23,7 @@ class TCPClient {
 	private URL URL = null;
 	private int port = 80;
 
-	private List<String> objectToDownload;
+	private List<String> objectToDownload = null;
 
 	private Socket clientSocket;
 
@@ -312,10 +312,15 @@ class TCPClient {
 				String fileName = parts[parts.length - 1];
 				DataInputStream in = new DataInputStream(clientSocket.getInputStream());
 			    DataOutputStream bw = new DataOutputStream(new DataOutputStream(clientSocket.getOutputStream()));
+			    
+			    
 			    System.out.println("xx");
-			    bw.writeBytes("GET /solar.jpg HTTP/1.1\r\n");
+			    
+			    String cmd =  "GET /solar.jpg HTTP/1.1\r\n";
+			    bw.write(cmd.getBytes());
 			    System.out.println("xx");
-			    bw.writeBytes("Host: localhost\r\n\r\n");
+			    cmd = "Host: localhost:8081\r\n\r\n";
+			    bw.writeBytes(cmd);
 			    bw.flush();
 			    
 			    
@@ -369,6 +374,7 @@ class TCPClient {
 			System.out.println("Images successfully stored locally.");
 		} catch (IOException e) {
 			System.err.println("Failed saving the images");
+			e.printStackTrace();
 		}
 	};
 
@@ -391,7 +397,7 @@ class TCPClient {
 //			System.out.println("src attribute is : "+src);
 
 //			System.out.println(src.getClass());
-			objectTodDownload.add(src.toString());
+			objectToDownload.add(src.toString());
 
 		}
 
